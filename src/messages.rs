@@ -8,7 +8,7 @@ pub struct AcedrgArgs {
     pub commandline_args: Vec<String>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy)]
 pub enum JobStatusInfo {
     Pending,
     Finished,
