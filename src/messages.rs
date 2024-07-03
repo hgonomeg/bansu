@@ -19,8 +19,6 @@ pub enum JobStatusInfo {
 pub struct AcedrgQueryReply {
     pub status: JobStatusInfo,
     pub error_message: Option<String>,
-    /// Base64-encoded data
-    pub cif_data: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]

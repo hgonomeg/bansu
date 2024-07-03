@@ -10,20 +10,21 @@ lazy_static! {
         Arc::from(Mutex::from(JobManager::new()));
 }
 
+pub const ACEDRG_OUTPUT_FILENAME: &'static str = "acedrg_output";
+
 pub struct JobOutput {
     pub stdout: String,
-    pub stderr: String
+    pub stderr: String,
 }
-
 
 pub enum JobFailureReason {
     TimedOut,
     IOError(std::io::Error),
-    AcedrgError
+    AcedrgError,
 }
 
 pub struct JobData {
-    workdir: WorkDir,
+    pub workdir: WorkDir,
     /// Use this to check if the job is still running
     pub status: JobStatusInfo,
     /// Only present if the job failed
@@ -31,7 +32,7 @@ pub struct JobData {
     /// Gets filled when the job completes.
     /// If the job fails, it will only be filled
     /// if the error came from acedrg itself
-    pub job_output: Option<JobOutput>
+    pub job_output: Option<JobOutput>,
 }
 
 pub struct JobManager {
@@ -58,20 +59,21 @@ impl JobManager {
             // TODO: SANITIZE INPUT!
             .args(args.commandline_args.clone())
             .arg("-o")
-            .arg("acedrg_output")
+            .arg(ACEDRG_OUTPUT_FILENAME)
             .spawn()?;
 
         let ret = Arc::from(Mutex::from(JobData {
             workdir,
             status: JobStatusInfo::Pending,
             job_output: None,
-            failure_reason: None
+            failure_reason: None,
         }));
 
         // Worker task
         let marc = ret.clone();
         let _ = tokio::task::spawn(async move {
-            let output_timeout_res = timeout(Duration::from_secs(5 * 60), child.wait_with_output()).await;
+            let output_timeout_res =
+                timeout(Duration::from_secs(5 * 60), child.wait_with_output()).await;
             let mut m_data = marc.lock().await;
             match output_timeout_res {
                 Err(_elapsed) => {
@@ -88,14 +90,13 @@ impl JobManager {
                     } else {
                         JobStatusInfo::Failed
                     };
-                    if ! output.status.success() {
+                    if !output.status.success() {
                         m_data.failure_reason = Some(JobFailureReason::AcedrgError);
                     }
                     m_data.job_output = Some(JobOutput {
                         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                        stdout: String::from_utf8_lossy(&output.stdout).to_string()
+                        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
                     });
-
                 }
             }
         });
