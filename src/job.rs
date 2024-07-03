@@ -11,8 +11,8 @@ lazy_static! {
 }
 
 pub struct JobOutput {
-    stdout: String,
-    stderr: String
+    pub stdout: String,
+    pub stderr: String
 }
 
 
@@ -60,7 +60,7 @@ impl JobManager {
             .arg("-o")
             .arg("acedrg_output")
             .spawn()?;
-        
+
         let ret = Arc::from(Mutex::from(JobData {
             workdir,
             status: JobStatusInfo::Pending,

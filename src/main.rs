@@ -1,7 +1,8 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer};
+use actix_web::{get, http::StatusCode, post, web, App, HttpResponse, HttpServer};
 pub mod job;
 pub mod messages;
 pub mod utils;
+use job::JobFailureReason;
 use messages::*;
 
 #[get("/query_acedrg/{job_id}")]
@@ -14,14 +15,33 @@ async fn query_acedrg(path: web::Path<JobId>) -> HttpResponse {
         return HttpResponse::NotFound().finish();
     };
     let job_data = job_data_arc.lock().await;
-    let r = AcedrgQueryReply {
-        // todo
-        error_message: None,
+    let mut error_message = None;
+    let mut http_status_code = StatusCode::OK;
+    if let Some(failure_reason) = job_data.failure_reason.as_ref() {
+        match failure_reason {
+            JobFailureReason::TimedOut => {
+                error_message = Some("Timed-out".to_string());
+                http_status_code = StatusCode::FAILED_DEPENDENCY;
+            }
+            JobFailureReason::IOError(e) => {
+                error_message = Some(format!("IO Error: {}", e));
+                http_status_code = StatusCode::INTERNAL_SERVER_ERROR;
+            }
+            JobFailureReason::AcedrgError =>{
+                let job_output = job_data.job_output.as_ref().unwrap();
+                error_message = Some(format!("Acedrg Error:\nSTDERR:\n{}\nSTDOUT:\n{}", job_output.stderr, job_output.stdout));
+                http_status_code = StatusCode::FAILED_DEPENDENCY;
+            },
+        }
+    }
+    let r_json = AcedrgQueryReply {
+        error_message,
         status: job_data.status,
         // todo
         cif_data: None,
     };
-    HttpResponse::Ok().json(r)
+    HttpResponse::build(http_status_code)
+        .json(r_json)
 }
 
 #[post("/spawn_acedrg")]
@@ -39,7 +59,7 @@ async fn spawn_acedrg(args: web::Json<AcedrgArgs>) -> HttpResponse {
         }
         Err(e) => {
             // todo: different error types?
-            HttpResponse::BadRequest().json(AcedrgSpawnReply {
+            HttpResponse::InternalServerError().json(AcedrgSpawnReply {
                 job_id: None,
                 error_message: Some(e.to_string()),
             })
