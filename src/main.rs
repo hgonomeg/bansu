@@ -61,15 +61,15 @@ async fn get_cif(path: web::Path<JobId>) -> HttpResponse {
     let mut filepath = job_data.workdir.path.clone();
     drop(job_data);
     filepath.push(format!("{}.cif", ACEDRG_OUTPUT_FILENAME));
-
-    let (tx, rx) = tokio::sync::mpsc::channel::<Result<web::Bytes, std::io::Error>>(64);
-    tokio::task::spawn(async move {
-        let file_res = tokio::fs::OpenOptions::new()
-            .read(true)
-            .open(filepath)
-            .await;
-        match file_res {
-            Ok(mut file) => {
+    let file_res = tokio::fs::OpenOptions::new()
+        .read(true)
+        .open(filepath)
+        .await;
+    match file_res {
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        Ok(mut file) => {
+            let (tx, rx) = tokio::sync::mpsc::channel::<Result<web::Bytes, std::io::Error>>(64);
+            tokio::task::spawn(async move {
                 loop {
                     let mut buf = web::BytesMut::with_capacity(65536);
                     let read_res = file.read_buf(&mut buf).await;
@@ -88,14 +88,11 @@ async fn get_cif(path: web::Path<JobId>) -> HttpResponse {
                         }
                     }
                 }
-            }
-            Err(e) => {
-                let _ = tx.send(Err(e)).await;
-            }
-        }
-    });
+            });
 
-    HttpResponse::Ok().streaming(tokio_stream::wrappers::ReceiverStream::new(rx))
+            HttpResponse::Ok().streaming(tokio_stream::wrappers::ReceiverStream::new(rx))
+        }
+    }
 }
 
 #[post("/spawn_acedrg")]
