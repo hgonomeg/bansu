@@ -1,32 +1,30 @@
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 pub type JobId = String;
 
 #[derive(Deserialize, Serialize)]
 pub struct AcedrgArgs {
-    smiles: String,
-    commandline_args: Vec<String>
+    pub smiles: String,
+    pub commandline_args: Vec<String>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone, Copy)]
 pub enum JobStatusInfo {
     Pending,
     Finished,
-    Failed
+    Failed,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct AcedrgQueryReply {
-    status: JobStatusInfo,
-    error_message: Option<String>,
+    pub status: JobStatusInfo,
+    pub error_message: Option<String>,
     /// Base64-encoded data
-    cif_data: Option<String>
+    pub cif_data: Option<String>,
 }
-
 
 #[derive(Deserialize, Serialize)]
 pub struct AcedrgSpawnReply {
-    job_id: JobId,
-    error_message: Option<String>
+    pub job_id: Option<JobId>,
+    pub error_message: Option<String>,
 }
