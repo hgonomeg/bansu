@@ -28,12 +28,6 @@ impl From<JobStatus> for JobStatusInfo {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct AcedrgQueryReply {
-    pub status: JobStatusInfo,
-    pub error_message: Option<String>,
-}
-
-#[derive(Deserialize, Serialize)]
 pub struct AcedrgSpawnReply {
     pub job_id: Option<JobId>,
     pub error_message: Option<String>,

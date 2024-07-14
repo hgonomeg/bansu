@@ -1,33 +1,33 @@
-use actix::prelude::*;
+use super::{JobData, JobFailureReason, JobOutput, JobStatus, ACEDRG_OUTPUT_FILENAME};
 use crate::{utils::*, AcedrgArgs};
-use super::{JobFailureReason, JobOutput, JobStatus, ACEDRG_OUTPUT_FILENAME};
+use actix::prelude::*;
 use std::process::Output;
 use std::{process::Stdio, time::Duration};
-use tokio::{process::{Child, Command}, time::timeout};
+use tokio::{
+    process::{Child, Command},
+    time::timeout,
+};
 
-
-#[derive(Debug, Clone)]
-pub struct JobData {
-    pub status: JobStatus,
-    /// Gets filled when the job completes.
-    /// If the job fails, it will only be filled
-    /// if the error came from acedrg itself
-    pub job_output: Option<JobOutput>,
+pub enum OutputKind {
+    CIF,
 }
-impl Message for JobData {
-    type Result = ();
+pub struct OutputPathRequest {
+    pub kind: OutputKind,
 }
 
 pub struct JobRunner {
     data: JobData,
     workdir: WorkDir,
     /// Event propagation
-    recipients: Vec<Recipient<JobData>>
+    recipients: Vec<Recipient<JobData>>,
 }
 
 impl Actor for JobRunner {
     type Context = Context<Self>;
-    
+}
+
+impl Message for OutputPathRequest {
+    type Result = std::io::Result<tokio::fs::File>;
 }
 
 struct WorkerResult(Result<std::io::Result<Output>, tokio::time::error::Elapsed>);
@@ -64,13 +64,40 @@ impl Handler<WorkerResult> for JobRunner {
     }
 }
 
+impl Handler<OutputPathRequest> for JobRunner {
+    type Result = ResponseActFuture<Self, <OutputPathRequest as actix::Message>::Result>;
+
+    fn handle(&mut self, msg: OutputPathRequest, _ctx: &mut Self::Context) -> Self::Result {
+        Box::pin(Self::open_output_file(msg.kind, self.workdir.path.clone()).into_actor(self))
+    }
+}
+
 impl JobRunner {
     async fn worker(child: Child, addr: Addr<Self>) {
         let res = timeout(Duration::from_secs(5 * 60), child.wait_with_output()).await;
         let _res = addr.send(WorkerResult(res)).await;
     }
+    async fn open_output_file(
+        kind: OutputKind,
+        workdir_filepath: std::path::PathBuf,
+    ) -> std::io::Result<tokio::fs::File> {
+        // TODO: Make sure that the job has completed!!!
+        let mut filepath = workdir_filepath;
+        match kind {
+            OutputKind::CIF => {
+                filepath.push(format!("{}.cif", ACEDRG_OUTPUT_FILENAME));
+            }
+        }
+        tokio::fs::OpenOptions::new()
+            .read(true)
+            .open(filepath)
+            .await
+    }
 
-    pub async fn create_job(recipients: Vec<Recipient<JobData>>, args: &AcedrgArgs) -> std::io::Result<Addr<JobRunner>> {
+    pub async fn create_job(
+        recipients: Vec<Recipient<JobData>>,
+        args: &AcedrgArgs,
+    ) -> std::io::Result<Addr<JobRunner>> {
         let workdir = mkworkdir().await?;
         let smiles_file_path = workdir.path.join("acedrg_smiles_input");
         dump_string_to_file(&smiles_file_path, &args.smiles).await?;
@@ -87,16 +114,14 @@ impl JobRunner {
             .arg(ACEDRG_OUTPUT_FILENAME)
             .spawn()?;
 
-        let ret = Self{
+        let ret = Self {
             workdir,
-            data: JobData{
+            data: JobData {
                 status: JobStatus::Pending,
                 job_output: None,
             },
-            recipients
+            recipients,
         };
-
-        
 
         Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {
             let worker = JobRunner::worker(child, ctx.address());
