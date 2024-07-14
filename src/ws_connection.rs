@@ -1,10 +1,12 @@
+use crate::job::{
+    job_runner::{AddRecipient, JobRunner},
+    JobData,
+};
 use actix::prelude::*;
 use actix_web_actors::ws;
-use crate::job::{job_runner::{AddRecipient, JobRunner}, JobData};
-
 
 pub struct WsConnection {
-    job: Addr<JobRunner>
+    job: Addr<JobRunner>,
 }
 
 impl Handler<JobData> for WsConnection {
@@ -26,9 +28,7 @@ impl Actor for WsConnection {
 
 impl WsConnection {
     pub fn new(job: Addr<JobRunner>) -> Self {
-        Self {
-            job
-        }
+        Self { job }
     }
 }
 
