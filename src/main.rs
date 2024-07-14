@@ -1,22 +1,24 @@
-use actix_web::{get, http::StatusCode, post, web, App, HttpResponse, HttpServer};
+use actix::prelude::*;
+use actix_web::{get, /*http::StatusCode*/ post, web::{self, Data}, App, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
 pub mod job;
-use job::job_runner::{JobRunner, OutputKind, OutputPathRequest};
+use job::{job_runner::{JobRunner, OutputKind, OutputPathRequest}, AddJob, JobManager, QueryJob};
 pub mod messages;
 pub mod utils;
+pub mod ws_connection;
+use ws_connection::WsConnection;
 use messages::*;
 use tokio::io::AsyncReadExt;
 
 #[get("/get_cif/{job_id}")]
-async fn get_cif(path: web::Path<JobId>) -> HttpResponse {
+async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>>) -> HttpResponse {
     let job_id = path.into_inner();
-    let jm_lock = job::JobManager::acquire_lock().await;
-    let job_data_opt = jm_lock.query_job(&job_id).map(|x| x.clone());
-    drop(jm_lock);
-    let Some(job_data) = job_data_opt else {
+    
+    let Some(job) = job_manager.send(QueryJob(job_id)).await.ok().flatten() else {
         return HttpResponse::NotFound().finish();
     };
-    let file_res = job_data
+
+    let file_res = job
         .send(OutputPathRequest {
             kind: OutputKind::CIF,
         })
@@ -53,14 +55,22 @@ async fn get_cif(path: web::Path<JobId>) -> HttpResponse {
     }
 }
 
+#[get("/ws/{job_id}")]
+async fn job_ws(path: web::Path<JobId>, req: HttpRequest, stream: web::Payload, job_manager: web::Data<Addr<JobManager>>) -> Result<HttpResponse, actix_web::Error> {
+    let job_id = path.into_inner();
+    let Some(job) = job_manager.send(QueryJob(job_id)).await.ok().flatten() else {
+        return Ok(HttpResponse::NotFound().finish());
+    };
+    ws::start(WsConnection::new(job), &req, stream)
+}
+
 #[post("/run_acedrg")]
-async fn run_acedrg(args: web::Json<AcedrgArgs>) -> HttpResponse {
+async fn run_acedrg(args: web::Json<AcedrgArgs>, job_manager: web::Data<Addr<JobManager>>) -> HttpResponse {
     let args = args.into_inner();
     // todo: sanitize input in create_job()!!!
     match JobRunner::create_job(vec![], &args).await {
         Ok(new_job) => {
-            let mut jm_lock = job::JobManager::acquire_lock().await;
-            let job_id = jm_lock.add_job(new_job);
+            let job_id = job_manager.send(AddJob(new_job)).await.unwrap();
             HttpResponse::Created().json(AcedrgSpawnReply {
                 job_id: Some(job_id),
                 error_message: None,
@@ -78,7 +88,7 @@ async fn run_acedrg(args: web::Json<AcedrgArgs>) -> HttpResponse {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| App::new().service(run_acedrg).service(get_cif))
+    HttpServer::new(|| App::new().app_data(Data::new(JobManager::new().start())).service(run_acedrg).service(get_cif).service(job_ws))
         .bind(("127.0.0.1", 8080))?
         .run()
         .await

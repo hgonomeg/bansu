@@ -1,16 +1,9 @@
 use super::messages::JobId;
 use actix::prelude::*;
+// use futures_util::FutureExt;
 use job_runner::JobRunner;
-use lazy_static::lazy_static;
-use std::sync::Arc;
 use std::{collections::BTreeMap, time::Duration};
-use tokio::sync::Mutex;
 pub mod job_runner;
-
-lazy_static! {
-    static ref GLOBAL_JOB_MANAGER: Arc<Mutex<JobManager>> =
-        Arc::from(Mutex::from(JobManager::new()));
-}
 
 pub const ACEDRG_OUTPUT_FILENAME: &'static str = "acedrg_output";
 
@@ -50,36 +43,63 @@ pub struct JobManager {
     jobs: BTreeMap<JobId, Addr<JobRunner>>,
 }
 
+impl Actor for JobManager {
+    type Context = Context<Self>;
+}
+
+pub struct AddJob(pub Addr<JobRunner>);
+impl Message for AddJob {
+    type Result = JobId;
+}
+
+pub struct QueryJob(pub JobId);
+impl Message for QueryJob {
+    type Result = Option<Addr<JobRunner>>;
+}
+
+impl Handler<QueryJob> for JobManager {
+    type Result = <QueryJob as actix::Message>::Result;
+
+    fn handle(&mut self, msg: QueryJob, _ctx: &mut Self::Context) -> Self::Result {
+        self.jobs.get(&msg.0).cloned()
+    }
+}
+
+struct RemoveJob(pub JobId);
+impl Message for RemoveJob {
+    type Result = ();
+}
+
+impl Handler<RemoveJob> for JobManager {
+    type Result = <RemoveJob as actix::Message>::Result;
+
+    fn handle(&mut self, msg: RemoveJob, _ctx: &mut Self::Context) -> Self::Result {
+        self.jobs.remove(&msg.0);
+    }
+}
+
+impl Handler<AddJob> for JobManager {
+    type Result = <AddJob as actix::Message>::Result;
+
+    fn handle(&mut self, msg: AddJob, ctx: &mut Self::Context) -> Self::Result {
+        let new_id = uuid::Uuid::new_v4();
+        let id = new_id.to_string();
+        self.jobs.insert(id.clone(), msg.0);
+
+        // Cleanup task
+        // Make sure to keep this longer than the job timeout
+        // We don't have to care if the job is still running or not.
+        // In the worst-case scenario, it should have timed-out a long time ago.
+        ctx.notify_later(RemoveJob(id.clone()), Duration::from_secs(15 * 60));
+
+        id
+    }
+}
+
 impl JobManager {
     pub fn new() -> Self {
         Self {
             jobs: BTreeMap::new(),
         }
-    }
-    pub async fn acquire_lock<'a>() -> tokio::sync::MutexGuard<'a, Self> {
-        let r = GLOBAL_JOB_MANAGER.lock().await;
-        r
-    }
-    pub fn add_job(&mut self, job: Addr<JobRunner>) -> JobId {
-        let new_id = uuid::Uuid::new_v4();
-        let id = new_id.to_string();
-        self.jobs.insert(id.clone(), job);
-
-        // Cleanup task
-        let m_id = id.clone();
-        tokio::task::spawn(async move {
-            // Make sure to keep this longer than the job timeout
-            tokio::time::sleep(Duration::from_secs(15 * 60)).await;
-            let mut jm_lock = GLOBAL_JOB_MANAGER.lock().await;
-            // We don't have to care if the job is still running or not.
-            // In the worst-case scenario, it should have timed-out a long time ago.
-            jm_lock.jobs.remove(&m_id);
-        });
-
-        id
-    }
-    pub fn query_job(&self, job_id: &JobId) -> Option<&Addr<JobRunner>> {
-        let job_opt = self.jobs.get(job_id);
-        job_opt
     }
 }

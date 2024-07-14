@@ -40,6 +40,19 @@ impl Message for OutputPathRequest {
     type Result = Result<tokio::fs::File, OutputRequestError>;
 }
 
+pub struct AddRecipient(pub Recipient<JobData>);
+impl Message for AddRecipient {
+    type Result = ();
+}
+
+impl Handler<AddRecipient> for JobRunner {
+    type Result = ();
+
+    fn handle(&mut self, msg: AddRecipient, _ctx: &mut Self::Context) -> Self::Result {
+        self.recipients.push(msg.0);
+    }
+}
+
 struct WorkerResult(Result<std::io::Result<Output>, tokio::time::error::Elapsed>);
 impl Message for WorkerResult {
     type Result = ();
