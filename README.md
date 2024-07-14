@@ -28,6 +28,7 @@ Combined together gives us:
 
 ## Todo
 
+* Move to websockets and actors
 * Design an abstraction for representing different job types (different programs).
 * Input validation!!!
 * Isolating jobs in containers
