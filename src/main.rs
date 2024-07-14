@@ -21,7 +21,7 @@ use ws_connection::WsConnection;
 async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>>) -> HttpResponse {
     let job_id = path.into_inner();
 
-    let Some(job) = job_manager.send(QueryJob(job_id)).await.ok().flatten() else {
+    let Some(job) = job_manager.send(QueryJob(job_id)).await.unwrap() else {
         return HttpResponse::NotFound().finish();
     };
 
