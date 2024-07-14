@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+actix = "0.13"
 actix-web = "4"
+actix-web-actors = "4"
 anyhow = "1"
 # bytes = "1"
 # futures-core = "0.3"
