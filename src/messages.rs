@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::job::JobStatus;
+
 pub type JobId = String;
 
 #[derive(Deserialize, Serialize)]
@@ -13,6 +15,16 @@ pub enum JobStatusInfo {
     Pending,
     Finished,
     Failed,
+}
+
+impl From<JobStatus> for JobStatusInfo {
+    fn from(value: JobStatus) -> Self {
+        match value {
+            JobStatus::Pending => JobStatusInfo::Pending,
+            JobStatus::Finished => JobStatusInfo::Finished,
+            JobStatus::Failed(_) => JobStatusInfo::Failed,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
