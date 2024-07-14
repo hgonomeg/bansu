@@ -12,7 +12,7 @@ pub struct WorkDir {
 impl Drop for WorkDir {
     fn drop(&mut self) {
         let path = std::mem::take(&mut self.path);
-        tokio::task::spawn(async move {
+        actix_rt::spawn(async move {
             let _ = fs::remove_dir_all(path).await;
         });
     }
