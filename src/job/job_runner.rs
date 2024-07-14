@@ -1,35 +1,76 @@
 use actix::prelude::*;
 use crate::{utils::*, AcedrgArgs};
 use super::{JobFailureReason, JobOutput, JobStatus, ACEDRG_OUTPUT_FILENAME};
-use std::sync::Arc;
+use std::process::Output;
 use std::{process::Stdio, time::Duration};
-use tokio::{process::Command, sync::Mutex, time::timeout};
+use tokio::{process::{Child, Command}, time::timeout};
 
-pub struct JobRunner {
-    pub workdir: WorkDir,
-    /// Use this to check if the job is still running
+
+#[derive(Debug, Clone)]
+pub struct JobData {
     pub status: JobStatus,
     /// Gets filled when the job completes.
     /// If the job fails, it will only be filled
     /// if the error came from acedrg itself
     pub job_output: Option<JobOutput>,
 }
+impl Message for JobData {
+    type Result = ();
+}
+
+pub struct JobRunner {
+    data: JobData,
+    workdir: WorkDir,
+    /// Event propagation
+    recipients: Vec<Recipient<JobData>>
+}
 
 impl Actor for JobRunner {
     type Context = Context<Self>;
-
-    // fn create<F>(f: F) -> Addr<Self>
-    // where
-    // Self: Actor<Context = Context<Self>>,
-    // F: FnOnce(&mut Context<Self>) -> Self {
-
-    //     let 
-    // }
     
 }
 
+struct WorkerResult(Result<std::io::Result<Output>, tokio::time::error::Elapsed>);
+impl Message for WorkerResult {
+    type Result = ();
+}
+
+impl Handler<WorkerResult> for JobRunner {
+    type Result = ();
+
+    fn handle(&mut self, msg: WorkerResult, _ctx: &mut Self::Context) -> Self::Result {
+        match msg.0 {
+            Err(_elapsed) => {
+                self.data.status = JobStatus::Failed(JobFailureReason::TimedOut);
+            }
+            Ok(Err(e)) => {
+                self.data.status = JobStatus::Failed(JobFailureReason::IOError(e.kind()));
+            }
+            Ok(Ok(output)) => {
+                self.data.status = if output.status.success() {
+                    JobStatus::Finished
+                } else {
+                    JobStatus::Failed(JobFailureReason::AcedrgError)
+                };
+                self.data.job_output = Some(JobOutput {
+                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                });
+            }
+        }
+        for i in &self.recipients {
+            i.do_send(self.data.clone());
+        }
+    }
+}
+
 impl JobRunner {
-    pub async fn create_job(args: &AcedrgArgs) -> std::io::Result<Addr<JobRunner>> {
+    async fn worker(child: Child, addr: Addr<Self>) {
+        let res = timeout(Duration::from_secs(5 * 60), child.wait_with_output()).await;
+        let _res = addr.send(WorkerResult(res)).await;
+    }
+
+    pub async fn create_job(recipients: Vec<Recipient<JobData>>, args: &AcedrgArgs) -> std::io::Result<Addr<JobRunner>> {
         let workdir = mkworkdir().await?;
         let smiles_file_path = workdir.path.join("acedrg_smiles_input");
         dump_string_to_file(&smiles_file_path, &args.smiles).await?;
@@ -48,41 +89,20 @@ impl JobRunner {
 
         let ret = Self{
             workdir,
-            status: JobStatus::Pending,
-            job_output: None,
+            data: JobData{
+                status: JobStatus::Pending,
+                job_output: None,
+            },
+            recipients
         };
 
-        // Worker task
-        let marc = ret.clone();
-        let _ = tokio::task::spawn(async move {
-            let output_timeout_res =
-                timeout(Duration::from_secs(5 * 60), child.wait_with_output()).await;
-            let mut m_data = marc.lock().await;
-            match output_timeout_res {
-                Err(_elapsed) => {
-                    m_data.status = JobStatusInfo::Failed;
-                    m_data.failure_reason = Some(JobFailureReason::TimedOut);
-                }
-                Ok(Err(e)) => {
-                    m_data.status = JobStatusInfo::Failed;
-                    m_data.failure_reason = Some(JobFailureReason::IOError(e));
-                }
-                Ok(Ok(output)) => {
-                    m_data.status = if output.status.success() {
-                        JobStatusInfo::Finished
-                    } else {
-                        JobStatusInfo::Failed
-                    };
-                    if !output.status.success() {
-                        m_data.failure_reason = Some(JobFailureReason::AcedrgError);
-                    }
-                    m_data.job_output = Some(JobOutput {
-                        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                    });
-                }
-            }
-        });
-        Ok(ret)
+        
+
+        Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {
+            let worker = JobRunner::worker(child, ctx.address());
+            let fut = actix::fut::wrap_future(worker);
+            ctx.spawn(fut);
+            ret
+        }))
     }
 }

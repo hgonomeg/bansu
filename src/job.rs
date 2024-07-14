@@ -13,22 +13,24 @@ lazy_static! {
 
 pub const ACEDRG_OUTPUT_FILENAME: &'static str = "acedrg_output";
 
+
+#[derive(Clone, Debug)]
 pub struct JobOutput {
     pub stdout: String,
     pub stderr: String,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum JobStatus {
     Pending,
     Finished,
     Failed(JobFailureReason),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum JobFailureReason {
     TimedOut,
-    IOError(std::io::Error),
+    IOError(std::io::ErrorKind),
     AcedrgError,
 }
 
@@ -91,7 +93,7 @@ impl JobManager {
                 }
                 Ok(Err(e)) => {
                     m_data.status = JobStatusInfo::Failed;
-                    m_data.failure_reason = Some(JobFailureReason::IOError(e));
+                    m_data.failure_reason = Some(JobFailureReason::IOError(e.kind()));
                 }
                 Ok(Ok(output)) => {
                     m_data.status = if output.status.success() {
