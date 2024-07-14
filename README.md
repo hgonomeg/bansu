@@ -26,3 +26,9 @@ Combined together gives us:
 
 [^1]: Note: A Japanese person will likely not recognize this character. It's rarely used.
 
+## Todo
+
+* Design an abstraction for representing different job types (different programs).
+* Input validation!!!
+* Isolating jobs in containers
+* Think about API design for defining graph-like pipelines (if we ever need that)
