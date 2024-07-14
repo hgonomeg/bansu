@@ -31,5 +31,6 @@ Combined together gives us:
 * Move to websockets and actors
 * Design an abstraction for representing different job types (different programs).
 * Input validation!!!
+* Logging
 * Isolating jobs in containers
 * Think about API design for defining graph-like pipelines (if we ever need that)
