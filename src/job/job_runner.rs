@@ -3,6 +3,7 @@ use crate::{utils::*, AcedrgArgs};
 use actix::prelude::*;
 use std::process::Output;
 use std::{process::Stdio, time::Duration};
+use thiserror::Error;
 use tokio::{
     process::{Child, Command},
     time::timeout,
@@ -11,6 +12,15 @@ use tokio::{
 pub enum OutputKind {
     CIF,
 }
+
+#[derive(Debug, Error)]
+pub enum OutputRequestError {
+    #[error("IOError {{?}}")]
+    IOError(#[from] std::io::Error),
+    #[error("Job is still running")]
+    JobStillPending,
+}
+
 pub struct OutputPathRequest {
     pub kind: OutputKind,
 }
@@ -27,7 +37,7 @@ impl Actor for JobRunner {
 }
 
 impl Message for OutputPathRequest {
-    type Result = std::io::Result<tokio::fs::File>;
+    type Result = Result<tokio::fs::File, OutputRequestError>;
 }
 
 struct WorkerResult(Result<std::io::Result<Output>, tokio::time::error::Elapsed>);
@@ -68,6 +78,9 @@ impl Handler<OutputPathRequest> for JobRunner {
     type Result = ResponseActFuture<Self, <OutputPathRequest as actix::Message>::Result>;
 
     fn handle(&mut self, msg: OutputPathRequest, _ctx: &mut Self::Context) -> Self::Result {
+        if self.data.status == JobStatus::Pending {
+            return Box::pin(async { Err(OutputRequestError::JobStillPending) }.into_actor(self));
+        }
         Box::pin(Self::open_output_file(msg.kind, self.workdir.path.clone()).into_actor(self))
     }
 }
@@ -80,18 +93,17 @@ impl JobRunner {
     async fn open_output_file(
         kind: OutputKind,
         workdir_filepath: std::path::PathBuf,
-    ) -> std::io::Result<tokio::fs::File> {
-        // TODO: Make sure that the job has completed!!!
+    ) -> Result<tokio::fs::File, OutputRequestError> {
         let mut filepath = workdir_filepath;
         match kind {
             OutputKind::CIF => {
                 filepath.push(format!("{}.cif", ACEDRG_OUTPUT_FILENAME));
             }
         }
-        tokio::fs::OpenOptions::new()
+        Ok(tokio::fs::OpenOptions::new()
             .read(true)
             .open(filepath)
-            .await
+            .await?)
     }
 
     pub async fn create_job(

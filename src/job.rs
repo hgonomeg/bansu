@@ -20,14 +20,14 @@ pub struct JobOutput {
     pub stderr: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum JobStatus {
     Pending,
     Finished,
     Failed(JobFailureReason),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JobFailureReason {
     TimedOut,
     IOError(std::io::ErrorKind),
