@@ -76,7 +76,12 @@ async fn job_ws(
     job_manager: web::Data<Addr<JobManager>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let job_id = path.into_inner();
-    let Some(job) = job_manager.send(QueryJob(job_id)).await.ok().flatten() else {
+    let Some(job) = job_manager
+        .send(QueryJob(job_id.clone()))
+        .await
+        .ok()
+        .flatten()
+    else {
         log::error!("/ws/{} - Job not found", job_id);
         return Ok(HttpResponse::NotFound().finish());
     };

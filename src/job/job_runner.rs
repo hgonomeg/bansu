@@ -94,6 +94,7 @@ impl Handler<OutputPathRequest> for JobRunner {
 
     fn handle(&mut self, msg: OutputPathRequest, _ctx: &mut Self::Context) -> Self::Result {
         if self.data.status == JobStatus::Pending {
+            log::info!("Turning down request for job output - the job is still pending.");
             return Box::pin(async { Err(OutputRequestError::JobStillPending) }.into_actor(self));
         }
         Box::pin(Self::open_output_file(msg.kind, self.workdir.path.clone()).into_actor(self))
