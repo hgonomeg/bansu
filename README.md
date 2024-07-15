@@ -32,6 +32,5 @@ Combined together gives us:
 * Design an abstraction for representing different job types (different programs).
   * Support for servalcat
 * Input validation!!!
-* Logging
 * Isolating jobs in containers
 * Think about API design for defining graph-like pipelines (if we ever need that)
