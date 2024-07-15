@@ -16,6 +16,7 @@ pub mod ws_connection;
 use messages::*;
 use tokio::io::AsyncReadExt;
 use ws_connection::WsConnection;
+// use log::{info,warn,error,debug};
 
 #[get("/get_cif/{job_id}")]
 async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>>) -> HttpResponse {
@@ -103,6 +104,8 @@ async fn run_acedrg(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    simple_logger::SimpleLogger::new().env().init().unwrap();
+
     HttpServer::new(|| {
         App::new()
             .app_data(Data::new(JobManager::new().start()))
