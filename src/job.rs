@@ -2,12 +2,13 @@ use super::messages::{AcedrgArgs, JobId};
 use actix::prelude::*;
 // use futures_util::FutureExt;
 use job_runner::JobRunner;
+use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, time::Duration};
 pub mod job_runner;
 
 pub const ACEDRG_OUTPUT_FILENAME: &'static str = "acedrg_output";
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JobOutput {
     pub stdout: String,
     pub stderr: String,

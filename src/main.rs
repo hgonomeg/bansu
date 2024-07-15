@@ -90,7 +90,7 @@ async fn job_ws(
         return Ok(HttpResponse::NotFound().finish());
     };
     let jm = job_manager.get_ref().clone();
-    ws::start(WsConnection::new(jm, job), &req, stream)
+    ws::start(WsConnection::new(jm, job, job_id), &req, stream)
 }
 
 #[post("/run_acedrg")]

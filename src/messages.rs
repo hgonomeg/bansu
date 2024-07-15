@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::job::JobStatus;
+use crate::job::{JobOutput, JobStatus};
 
 pub type JobId = String;
 
@@ -24,6 +24,16 @@ impl From<JobStatus> for JobStatusInfo {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WsJobDataUpdate {
     pub status: JobStatusInfo,
+    pub job_output: Option<JobOutput>,
+}
+
+impl From<crate::job::JobData> for WsJobDataUpdate {
+    fn from(value: crate::job::JobData) -> Self {
+        Self {
+            status: JobStatusInfo::from(value.status),
+            job_output: value.job_output,
+        }
+    }
 }
 
 // #[derive(Clone, Debug, Deserialize, Serialize)]

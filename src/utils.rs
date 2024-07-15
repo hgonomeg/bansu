@@ -22,7 +22,7 @@ impl Drop for WorkDir {
 pub async fn mkworkdir() -> std::io::Result<WorkDir> {
     let u = Uuid::new_v4();
     let mut base = temp_dir();
-    base.push(format!("acedrgserver-{}", u.to_string()));
+    base.push(format!("bansu-{}", u.to_string()));
     fs::create_dir(&base).await?;
     Ok(WorkDir { path: base })
 }

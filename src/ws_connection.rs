@@ -1,28 +1,31 @@
 use crate::{
     job::{
         job_runner::{AddWebSocketAddr, JobRunner, QueryJobData},
-        JobData, JobManager,
+        JobData, JobManager, JobStatus,
     },
     messages::*,
 };
 use actix::prelude::*;
-use actix_web_actors::ws;
+use actix_web_actors::ws::{self, CloseCode, CloseReason};
 
 pub struct WsConnection {
     _job_manager: Addr<JobManager>,
     job: Addr<JobRunner>,
+    job_id: JobId,
 }
 
 impl Handler<JobData> for WsConnection {
     type Result = <JobData as actix::Message>::Result;
 
     fn handle(&mut self, msg: JobData, ctx: &mut Self::Context) -> Self::Result {
-        ctx.text(
-            serde_json::to_string(&WsJobDataUpdate {
-                status: JobStatusInfo::from(msg.status),
-            })
-            .unwrap(),
-        );
+        log::info!("Sending JobDataUpdate for job {}", self.job_id);
+        ctx.text(serde_json::to_string(&WsJobDataUpdate::from(msg.clone())).unwrap());
+        if msg.status == JobStatus::Finished {
+            ctx.close(Some(CloseReason {
+                code: CloseCode::Normal,
+                description: None,
+            }));
+        }
     }
 }
 
@@ -31,6 +34,7 @@ impl Actor for WsConnection {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.job.do_send(AddWebSocketAddr(ctx.address()));
+        log::info!("Initializing WebSocket connection for job {}", self.job_id);
         let job = self.job.clone();
         ctx.spawn(
             async move {
@@ -43,13 +47,18 @@ impl Actor for WsConnection {
             }),
         );
     }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        log::info!("Closed WebSocket connection for job {}", self.job_id);
+    }
 }
 
 impl WsConnection {
-    pub fn new(job_manager: Addr<JobManager>, job: Addr<JobRunner>) -> Self {
+    pub fn new(job_manager: Addr<JobManager>, job: Addr<JobRunner>, job_id: JobId) -> Self {
         Self {
             job,
             _job_manager: job_manager,
+            job_id,
         }
     }
     // fn query_job(&self, _job_id: JobId) {
