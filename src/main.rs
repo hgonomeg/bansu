@@ -7,7 +7,7 @@ use actix_web::{
 use actix_web_actors::ws;
 pub mod job;
 use job::{
-    job_runner::{OutputKind, OutputPathRequest},
+    job_runner::{OutputKind, OutputPathRequest, OutputRequestError},
     JobManager, NewJob, QueryJob,
 };
 pub mod messages;
@@ -35,9 +35,13 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
         .unwrap();
 
     match file_res {
-        Err(e) => {
+        Err(OutputRequestError::IOError(e)) => {
             log::error!("/get_cif/{} - Could not open output - {}", job_id, &e);
             HttpResponse::InternalServerError().body(e.to_string())
+        }
+        Err(OutputRequestError::JobStillPending) => {
+            log::warn!("/get_cif/{} - Job is still pending.", job_id);
+            HttpResponse::BadRequest().finish()
         }
         Ok(mut file) => {
             let (tx, rx) = tokio::sync::mpsc::channel::<Result<web::Bytes, std::io::Error>>(64);
