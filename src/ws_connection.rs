@@ -1,5 +1,5 @@
 use crate::{
-    job::{JobData, JobManager, job_runner::JobRunner},
+    job::{job_runner::JobRunner, JobData, JobManager},
     messages::*,
 };
 use actix::prelude::*;
@@ -7,7 +7,7 @@ use actix_web_actors::ws;
 
 pub struct WsConnection {
     job_manager: Addr<JobManager>,
-    job: Addr<JobRunner>
+    job: Addr<JobRunner>,
 }
 
 impl Handler<JobData> for WsConnection {
@@ -31,7 +31,7 @@ impl WsConnection {
         Self { job_manager, job }
     }
     // fn query_job(&self, _job_id: JobId) {
-        
+
     // }
 }
 
