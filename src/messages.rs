@@ -31,6 +31,7 @@ pub enum ClientMessageKind {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClientMessage {
     pub kind: ClientMessageKind,
+    /// for querying only
     pub job_id: Option<JobId>,
     pub acedrg_data: Option<AcedrgArgs>,
 }

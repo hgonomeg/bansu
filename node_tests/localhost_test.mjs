@@ -3,9 +3,15 @@ import WebSocket from 'ws';
 // Create WebSocket connection.
 const socket = new WebSocket("ws://localhost:8080/bansu_ws");
 
+async function launch_pipeline() {
+    //console.log("Sending stuff");
+    //socket.send("{\"kind\": \"SpawnAcedrg\", \"acedrg_data\": {\"smiles\": \"c1ccccc1\", \"commandline_args\": []}}");
+}
+
 // Connection opened
 socket.addEventListener("open", (event) => {
     console.log("Connection established.");
+    launch_pipeline();
     
 });
 
@@ -14,7 +20,7 @@ socket.addEventListener("close", (event) => {
 });
 
 socket.addEventListener("error", (event) => {
-    console.error("Connection errored-out: {}", event);
+    console.error("Connection errored-out: ", event);
 });
 
 // Listen for messages
