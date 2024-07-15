@@ -28,7 +28,6 @@ Combined together gives us:
 
 ## Todo
 
-* Move to websockets and actors
 * Design an abstraction for representing different job types (different programs).
   * Support for servalcat
 * Input validation!!!
