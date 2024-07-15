@@ -30,6 +30,7 @@ Combined together gives us:
 
 * Move to websockets and actors
 * Design an abstraction for representing different job types (different programs).
+  * Support for servalcat
 * Input validation!!!
 * Logging
 * Isolating jobs in containers
