@@ -21,20 +21,21 @@ impl From<JobStatus> for JobStatusInfo {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum ClientMessageKind {
-    QueryJob,
-    SpawnAcedrg,
-    //GetCIF
-}
+// #[derive(Clone, Debug, Deserialize, Serialize)]
+// pub enum WsClientMessageKind {
+//     QueryJob,
+//     // This is a bad idea
+//     //SpawnAcedrg,
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ClientMessage {
-    pub kind: ClientMessageKind,
-    /// for querying only
-    pub job_id: Option<JobId>,
-    pub acedrg_data: Option<AcedrgArgs>,
-}
+//     //GetCIF
+// }
+
+// #[derive(Clone, Debug, Deserialize, Serialize)]
+// pub struct WsClientMessage {
+//     pub kind: WsClientMessageKind,
+//     /// for querying only
+//     pub job_id: Option<JobId>,
+// }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct GenericErrorMessage {

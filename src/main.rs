@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use actix_web::{
-    get, /*http::StatusCode, post */
+    get, /*http::StatusCode*/ post,
     web::{self, Data},
     App, HttpRequest, HttpResponse, HttpServer,
 };
@@ -8,7 +8,7 @@ use actix_web_actors::ws;
 pub mod job;
 use job::{
     job_runner::{OutputKind, OutputPathRequest, OutputRequestError},
-    JobManager, QueryJob,
+    JobManager, NewJob, QueryJob,
 };
 pub mod messages;
 pub mod utils;
@@ -72,38 +72,49 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
     }
 }
 
-#[get("/bansu_ws")]
-async fn bansu_ws(
+#[get("/ws/{job_id}")]
+async fn job_ws(
+    path: web::Path<JobId>,
     req: HttpRequest,
     stream: web::Payload,
     job_manager: web::Data<Addr<JobManager>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let jm = job_manager.get_ref();
-    ws::start(WsConnection::new(jm.clone()), &req, stream)
+    let job_id = path.into_inner();
+    let Some(job) = job_manager
+        .send(QueryJob(job_id.clone()))
+        .await
+        .ok()
+        .flatten()
+    else {
+        log::error!("/ws/{} - Job not found", job_id);
+        return Ok(HttpResponse::NotFound().finish());
+    };
+    let jm = job_manager.get_ref().clone();
+    ws::start(WsConnection::new(jm, job), &req, stream)
 }
 
-// #[post("/run_acedrg")]
-// async fn run_acedrg(
-//     args: web::Json<AcedrgArgs>,
-//     job_manager: web::Data<Addr<JobManager>>,
-// ) -> HttpResponse {
-//     let args = args.into_inner();
+#[post("/run_acedrg")]
+async fn run_acedrg(
+    args: web::Json<AcedrgArgs>,
+    job_manager: web::Data<Addr<JobManager>>,
+) -> HttpResponse {
+    let args = args.into_inner();
 
-//     match job_manager.send(NewJob(args)).await.unwrap() {
-//         Ok((job_id, _new_job)) => HttpResponse::Created().json(AcedrgSpawnReply {
-//             job_id: Some(job_id),
-//             error_message: None,
-//         }),
-//         Err(e) => {
-//             log::error!("/run_acedrg - {}", &e);
-//             // todo: different error types?
-//             HttpResponse::InternalServerError().json(AcedrgSpawnReply {
-//                 job_id: None,
-//                 error_message: Some(e.to_string()),
-//             })
-//         }
-//     }
-// }
+    match job_manager.send(NewJob(args)).await.unwrap() {
+        Ok((job_id, _new_job)) => HttpResponse::Created().json(AcedrgSpawnReply {
+            job_id: Some(job_id),
+            error_message: None,
+        }),
+        Err(e) => {
+            log::error!("/run_acedrg - {}", &e);
+            // todo: different error types?
+            HttpResponse::InternalServerError().json(AcedrgSpawnReply {
+                job_id: None,
+                error_message: Some(e.to_string()),
+            })
+        }
+    }
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -113,8 +124,9 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(Data::new(job_manager.clone()))
+            .service(run_acedrg)
             .service(get_cif)
-            .service(bansu_ws)
+            .service(job_ws)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
