@@ -61,7 +61,7 @@ impl Handler<QueryJob> for JobManager {
     type Result = <QueryJob as actix::Message>::Result;
 
     fn handle(&mut self, msg: QueryJob, _ctx: &mut Self::Context) -> Self::Result {
-        log::debug!("Jobs={:?}", self.jobs.keys().collect::<Vec<_>>());
+        //log::debug!("Jobs={:?}", self.jobs.keys().collect::<Vec<_>>());
         self.jobs.get(&msg.0).cloned()
     }
 }

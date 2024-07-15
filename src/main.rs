@@ -119,9 +119,10 @@ async fn run_acedrg(
 async fn main() -> std::io::Result<()> {
     simple_logger::SimpleLogger::new().env().init().unwrap();
 
-    HttpServer::new(|| {
+    let job_manager = JobManager::new().start();
+    HttpServer::new(move || {
         App::new()
-            .app_data(Data::new(JobManager::new().start()))
+            .app_data(Data::new(job_manager.clone()))
             .service(run_acedrg)
             .service(get_cif)
             .service(job_ws)
