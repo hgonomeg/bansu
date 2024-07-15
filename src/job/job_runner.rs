@@ -1,4 +1,5 @@
 use super::{JobData, JobFailureReason, JobOutput, JobStatus, ACEDRG_OUTPUT_FILENAME};
+use crate::ws_connection::WsConnection;
 use crate::{utils::*, AcedrgArgs};
 use actix::prelude::*;
 use std::process::Output;
@@ -30,7 +31,7 @@ pub struct JobRunner {
     data: JobData,
     workdir: WorkDir,
     /// Event propagation
-    recipients: Vec<Recipient<JobData>>,
+    websocket_addrs: Vec<Addr<WsConnection>>,
 }
 
 impl Actor for JobRunner {
@@ -41,22 +42,34 @@ impl Message for OutputPathRequest {
     type Result = Result<tokio::fs::File, OutputRequestError>;
 }
 
-pub struct AddRecipient(pub Recipient<JobData>);
-impl Message for AddRecipient {
+pub struct AddWebSocketAddr(pub Addr<WsConnection>);
+impl Message for AddWebSocketAddr {
     type Result = ();
 }
 
-impl Handler<AddRecipient> for JobRunner {
+impl Handler<AddWebSocketAddr> for JobRunner {
     type Result = ();
 
-    fn handle(&mut self, msg: AddRecipient, _ctx: &mut Self::Context) -> Self::Result {
-        self.recipients.push(msg.0);
+    fn handle(&mut self, msg: AddWebSocketAddr, _ctx: &mut Self::Context) -> Self::Result {
+        self.websocket_addrs.push(msg.0);
     }
 }
 
 struct WorkerResult(Result<std::io::Result<Output>, tokio::time::error::Elapsed>);
 impl Message for WorkerResult {
     type Result = ();
+}
+
+#[derive(Message)]
+#[rtype(result = "JobData")]
+pub struct QueryJobData;
+
+impl Handler<QueryJobData> for JobRunner {
+    type Result = JobData;
+
+    fn handle(&mut self, _msg: QueryJobData, _ctx: &mut Self::Context) -> Self::Result {
+        self.data.clone()
+    }
 }
 
 impl Handler<WorkerResult> for JobRunner {
@@ -88,7 +101,7 @@ impl Handler<WorkerResult> for JobRunner {
             self.id,
             &self.data.status
         );
-        for i in &self.recipients {
+        for i in &self.websocket_addrs {
             i.do_send(self.data.clone());
         }
     }
@@ -132,11 +145,7 @@ impl JobRunner {
             .await?)
     }
 
-    pub async fn create_job(
-        id: String,
-        recipients: Vec<Recipient<JobData>>,
-        args: &AcedrgArgs,
-    ) -> std::io::Result<Addr<JobRunner>> {
+    pub async fn create_job(id: String, args: &AcedrgArgs) -> std::io::Result<Addr<JobRunner>> {
         let workdir = mkworkdir().await?;
         let smiles_file_path = workdir.path.join("acedrg_smiles_input");
         dump_string_to_file(&smiles_file_path, &args.smiles).await?;
@@ -160,7 +169,7 @@ impl JobRunner {
                 status: JobStatus::Pending,
                 job_output: None,
             },
-            recipients,
+            websocket_addrs: vec![],
         };
 
         Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {

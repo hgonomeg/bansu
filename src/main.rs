@@ -8,7 +8,7 @@ use actix_web_actors::ws;
 pub mod job;
 use job::{
     job_runner::{OutputKind, OutputPathRequest, OutputRequestError},
-    JobManager, NewJob, QueryJob,
+    JobManager, LookupJob, NewJob,
 };
 pub mod messages;
 pub mod utils;
@@ -22,7 +22,7 @@ use ws_connection::WsConnection;
 async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>>) -> HttpResponse {
     let job_id = path.into_inner();
 
-    let Some(job) = job_manager.send(QueryJob(job_id.clone())).await.unwrap() else {
+    let Some(job) = job_manager.send(LookupJob(job_id.clone())).await.unwrap() else {
         log::error!("/get_cif/{} - Job not found", job_id);
         return HttpResponse::NotFound().finish();
     };
@@ -81,7 +81,7 @@ async fn job_ws(
 ) -> Result<HttpResponse, actix_web::Error> {
     let job_id = path.into_inner();
     let Some(job) = job_manager
-        .send(QueryJob(job_id.clone()))
+        .send(LookupJob(job_id.clone()))
         .await
         .ok()
         .flatten()

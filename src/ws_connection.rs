@@ -1,34 +1,56 @@
 use crate::{
-    job::{job_runner::JobRunner, JobData, JobManager},
+    job::{
+        job_runner::{AddWebSocketAddr, JobRunner, QueryJobData},
+        JobData, JobManager,
+    },
     messages::*,
 };
 use actix::prelude::*;
 use actix_web_actors::ws;
 
 pub struct WsConnection {
-    job_manager: Addr<JobManager>,
+    _job_manager: Addr<JobManager>,
     job: Addr<JobRunner>,
 }
 
 impl Handler<JobData> for WsConnection {
     type Result = <JobData as actix::Message>::Result;
 
-    fn handle(&mut self, _msg: JobData, _ctx: &mut Self::Context) -> Self::Result {
-        // todo: send info on websocket
+    fn handle(&mut self, msg: JobData, ctx: &mut Self::Context) -> Self::Result {
+        ctx.text(
+            serde_json::to_string(&WsJobDataUpdate {
+                status: JobStatusInfo::from(msg.status),
+            })
+            .unwrap(),
+        );
     }
 }
 
 impl Actor for WsConnection {
     type Context = ws::WebsocketContext<Self>;
 
-    // fn started(&mut self, ctx: &mut Self::Context) {
-
-    // }
+    fn started(&mut self, ctx: &mut Self::Context) {
+        self.job.do_send(AddWebSocketAddr(ctx.address()));
+        let job = self.job.clone();
+        ctx.spawn(
+            async move {
+                let data = job.send(QueryJobData).await.unwrap();
+                data
+            }
+            .into_actor(self)
+            .map(|data, _a, ctx| {
+                ctx.notify(data);
+            }),
+        );
+    }
 }
 
 impl WsConnection {
     pub fn new(job_manager: Addr<JobManager>, job: Addr<JobRunner>) -> Self {
-        Self { job_manager, job }
+        Self {
+            job,
+            _job_manager: job_manager,
+        }
     }
     // fn query_job(&self, _job_id: JobId) {
 
@@ -51,7 +73,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
             Ok(ws::Message::Ping(_msg)) => {
                 ctx.pong(&[]);
             }
-            Ok(ws::Message::Text(text)) => {
+            Ok(ws::Message::Text(_text)) => {
                 // let client_message = serde_json::from_str::<WsClientMessage>(&text);
                 // match client_message {
                 //     Ok(client_message) => match client_message.kind {

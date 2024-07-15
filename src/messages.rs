@@ -4,7 +4,7 @@ use crate::job::JobStatus;
 
 pub type JobId = String;
 
-#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum JobStatusInfo {
     Pending,
     Finished,
@@ -19,6 +19,11 @@ impl From<JobStatus> for JobStatusInfo {
             JobStatus::Failed(_) => JobStatusInfo::Failed,
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct WsJobDataUpdate {
+    pub status: JobStatusInfo,
 }
 
 // #[derive(Clone, Debug, Deserialize, Serialize)]

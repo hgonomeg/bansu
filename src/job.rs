@@ -27,7 +27,7 @@ pub enum JobFailureReason {
     AcedrgError,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, MessageResponse)]
 pub struct JobData {
     pub status: JobStatus,
     /// Gets filled when the job completes.
@@ -52,15 +52,15 @@ impl Message for NewJob {
     type Result = std::io::Result<(JobId, Addr<JobRunner>)>;
 }
 
-pub struct QueryJob(pub JobId);
-impl Message for QueryJob {
+pub struct LookupJob(pub JobId);
+impl Message for LookupJob {
     type Result = Option<Addr<JobRunner>>;
 }
 
-impl Handler<QueryJob> for JobManager {
-    type Result = <QueryJob as actix::Message>::Result;
+impl Handler<LookupJob> for JobManager {
+    type Result = <LookupJob as actix::Message>::Result;
 
-    fn handle(&mut self, msg: QueryJob, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: LookupJob, _ctx: &mut Self::Context) -> Self::Result {
         //log::debug!("Jobs={:?}", self.jobs.keys().collect::<Vec<_>>());
         self.jobs.get(&msg.0).cloned()
     }
@@ -95,7 +95,7 @@ impl Handler<NewJob> for JobManager {
             async move {
                 let args = msg.0;
                 // todo: sanitize input in create_job()!!!
-                JobRunner::create_job(id.clone(), vec![], &args)
+                JobRunner::create_job(id.clone(), &args)
                     .await
                     .map(|addr| (id, addr))
             }
