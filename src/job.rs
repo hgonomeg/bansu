@@ -94,13 +94,11 @@ impl Handler<NewJob> for JobManager {
         Box::pin(async move {
             let args = msg.0;
             // todo: sanitize input in create_job()!!!
-
             JobRunner::create_job(id.clone(), vec![], &args).await
                 .map(|addr| (id, addr))
-            // Err::<(String, Addr<JobRunner>), std::io::Error>(std::io::Error::new(std::io::ErrorKind::Other, "j"))
-        }.into_actor(self).map(|job_res, _actor , ctx| {
+        }.into_actor(self).map(|job_res, actor , ctx| {
             job_res.map(|(jid, job)| {
-                self.jobs.insert(jid.clone(), job.clone());
+                actor.jobs.insert(jid.clone(), job.clone());
 
                 // Cleanup task
                 // Make sure to keep this longer than the job timeout
