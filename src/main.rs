@@ -22,7 +22,8 @@ use ws_connection::WsConnection;
 async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>>) -> HttpResponse {
     let job_id = path.into_inner();
 
-    let Some(job) = job_manager.send(QueryJob(job_id)).await.unwrap() else {
+    let Some(job) = job_manager.send(QueryJob(job_id.clone())).await.unwrap() else {
+        log::error!("/get_cif/{} - Job not found", job_id);
         return HttpResponse::NotFound().finish();
     };
 
@@ -34,10 +35,14 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
         .unwrap();
 
     match file_res {
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        Err(e) => {
+            log::error!("/get_cif/{} - Could not open output - {}", job_id, &e);
+            HttpResponse::InternalServerError().body(e.to_string())
+        }
         Ok(mut file) => {
             let (tx, rx) = tokio::sync::mpsc::channel::<Result<web::Bytes, std::io::Error>>(64);
             tokio::task::spawn(async move {
+                log::info!("/get_cif/{} - Replying with CIF file", job_id);
                 loop {
                     let mut buf = web::BytesMut::with_capacity(65536);
                     let read_res = file.read_buf(&mut buf).await;
@@ -72,6 +77,7 @@ async fn job_ws(
 ) -> Result<HttpResponse, actix_web::Error> {
     let job_id = path.into_inner();
     let Some(job) = job_manager.send(QueryJob(job_id)).await.ok().flatten() else {
+        log::error!("/ws/{} - Job not found", job_id);
         return Ok(HttpResponse::NotFound().finish());
     };
     ws::start(WsConnection::new(job), &req, stream)
@@ -87,12 +93,14 @@ async fn run_acedrg(
     match JobRunner::create_job(vec![], &args).await {
         Ok(new_job) => {
             let job_id = job_manager.send(AddJob(new_job)).await.unwrap();
+            // log::info!();
             HttpResponse::Created().json(AcedrgSpawnReply {
                 job_id: Some(job_id),
                 error_message: None,
             })
         }
         Err(e) => {
+            log::error!("/run_acedrg - {}", &e);
             // todo: different error types?
             HttpResponse::InternalServerError().json(AcedrgSpawnReply {
                 job_id: None,

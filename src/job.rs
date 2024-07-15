@@ -75,6 +75,7 @@ impl Handler<RemoveJob> for JobManager {
 
     fn handle(&mut self, msg: RemoveJob, _ctx: &mut Self::Context) -> Self::Result {
         self.jobs.remove(&msg.0);
+        log::info!("Removed job with ID={}", msg.0);
     }
 }
 
@@ -91,6 +92,8 @@ impl Handler<AddJob> for JobManager {
         // We don't have to care if the job is still running or not.
         // In the worst-case scenario, it should have timed-out a long time ago.
         ctx.notify_later(RemoveJob(id.clone()), Duration::from_secs(15 * 60));
+
+        log::info!("Added job with ID={}", &id);
 
         id
     }
