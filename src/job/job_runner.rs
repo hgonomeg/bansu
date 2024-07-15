@@ -83,7 +83,11 @@ impl Handler<WorkerResult> for JobRunner {
                 });
             }
         }
-        log::info!("JobRunner - job status updated: {:?}", &self.data.status);
+        log::info!(
+            "JobRunner:job:{} - Status updated: {:?}",
+            self.id,
+            &self.data.status
+        );
         for i in &self.recipients {
             i.do_send(self.data.clone());
         }
@@ -95,7 +99,10 @@ impl Handler<OutputPathRequest> for JobRunner {
 
     fn handle(&mut self, msg: OutputPathRequest, _ctx: &mut Self::Context) -> Self::Result {
         if self.data.status == JobStatus::Pending {
-            log::info!("Turning down request for job output - the job is still pending.");
+            log::info!(
+                "JobRunner:job:{} - Turning down request for output - the job is still pending.",
+                self.id
+            );
             return Box::pin(async { Err(OutputRequestError::JobStillPending) }.into_actor(self));
         }
         Box::pin(Self::open_output_file(msg.kind, self.workdir.path.clone()).into_actor(self))
@@ -103,11 +110,11 @@ impl Handler<OutputPathRequest> for JobRunner {
 }
 
 impl JobRunner {
-    async fn worker(child: Child, addr: Addr<Self>) {
-        log::info!("Started JobRunner worker.");
+    async fn worker(child: Child, addr: Addr<Self>, id: String) {
+        log::info!("JobRunner:job:{} - Started worker", &id);
         let res = timeout(Duration::from_secs(5 * 60), child.wait_with_output()).await;
         let _res = addr.send(WorkerResult(res)).await;
-        log::info!("JobRunner worker terminates.");
+        log::info!("JobRunner:job:{} - Worker terminates", id);
     }
     async fn open_output_file(
         kind: OutputKind,
@@ -147,7 +154,7 @@ impl JobRunner {
             .spawn()?;
 
         let ret = Self {
-            id,
+            id: id.clone(),
             workdir,
             data: JobData {
                 status: JobStatus::Pending,
@@ -157,7 +164,7 @@ impl JobRunner {
         };
 
         Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {
-            let worker = JobRunner::worker(child, ctx.address());
+            let worker = JobRunner::worker(child, ctx.address(), id);
             let fut = actix::fut::wrap_future(worker);
             ctx.spawn(fut);
             ret

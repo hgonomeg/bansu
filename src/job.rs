@@ -1,4 +1,4 @@
-use super::messages::{AcedrgArgs,JobId};
+use super::messages::{AcedrgArgs, JobId};
 use actix::prelude::*;
 // use futures_util::FutureExt;
 use job_runner::JobRunner;
@@ -87,29 +87,34 @@ impl Handler<NewJob> for JobManager {
         let id = loop {
             let new_id = uuid::Uuid::new_v4();
             let id = new_id.to_string();
-            if ! self.jobs.contains_key(&id) {
+            if !self.jobs.contains_key(&id) {
                 break id;
             }
         };
-        Box::pin(async move {
-            let args = msg.0;
-            // todo: sanitize input in create_job()!!!
-            JobRunner::create_job(id.clone(), vec![], &args).await
-                .map(|addr| (id, addr))
-        }.into_actor(self).map(|job_res, actor , ctx| {
-            job_res.map(|(jid, job)| {
-                actor.jobs.insert(jid.clone(), job.clone());
+        Box::pin(
+            async move {
+                let args = msg.0;
+                // todo: sanitize input in create_job()!!!
+                JobRunner::create_job(id.clone(), vec![], &args)
+                    .await
+                    .map(|addr| (id, addr))
+            }
+            .into_actor(self)
+            .map(|job_res, actor, ctx| {
+                job_res.map(|(jid, job)| {
+                    actor.jobs.insert(jid.clone(), job.clone());
 
-                // Cleanup task
-                // Make sure to keep this longer than the job timeout
-                // We don't have to care if the job is still running or not.
-                // In the worst-case scenario, it should have timed-out a long time ago.
-                ctx.notify_later(RemoveJob(jid.clone()), Duration::from_secs(15 * 60));
-        
-                log::info!("Added job with ID={}", &jid);
-                (jid, job)
-            })
-        }))
+                    // Cleanup task
+                    // Make sure to keep this longer than the job timeout
+                    // We don't have to care if the job is still running or not.
+                    // In the worst-case scenario, it should have timed-out a long time ago.
+                    ctx.notify_later(RemoveJob(jid.clone()), Duration::from_secs(15 * 60));
+
+                    log::info!("Added job with ID={}", &jid);
+                    (jid, job)
+                })
+            }),
+        )
     }
 }
 

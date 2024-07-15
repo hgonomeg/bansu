@@ -7,8 +7,8 @@ use actix_web::{
 use actix_web_actors::ws;
 pub mod job;
 use job::{
-    job_runner::{JobRunner, OutputKind, OutputPathRequest},
-    NewJob, JobManager, QueryJob,
+    job_runner::{OutputKind, OutputPathRequest},
+    JobManager, NewJob, QueryJob,
 };
 pub mod messages;
 pub mod utils;
@@ -96,12 +96,10 @@ async fn run_acedrg(
     let args = args.into_inner();
 
     match job_manager.send(NewJob(args)).await.unwrap() {
-        Ok((job_id, _new_job)) => {
-            HttpResponse::Created().json(AcedrgSpawnReply {
-                job_id: Some(job_id),
-                error_message: None,
-            })
-        }
+        Ok((job_id, _new_job)) => HttpResponse::Created().json(AcedrgSpawnReply {
+            job_id: Some(job_id),
+            error_message: None,
+        }),
         Err(e) => {
             log::error!("/run_acedrg - {}", &e);
             // todo: different error types?
