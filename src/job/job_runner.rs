@@ -1,9 +1,10 @@
 use super::{JobData, JobFailureReason, JobOutput, JobStatus, ACEDRG_OUTPUT_FILENAME};
+use crate::job::ACEDRG_TIMEOUT;
 use crate::ws_connection::WsConnection;
 use crate::{utils::*, AcedrgArgs};
 use actix::prelude::*;
 use std::process::Output;
-use std::{process::Stdio, time::Duration};
+use std::process::Stdio;
 use thiserror::Error;
 use tokio::{
     process::{Child, Command},
@@ -125,7 +126,7 @@ impl Handler<OutputPathRequest> for JobRunner {
 impl JobRunner {
     async fn worker(child: Child, addr: Addr<Self>, id: String) {
         log::info!("JobRunner:job:{} - Started worker", &id);
-        let res = timeout(Duration::from_secs(5 * 60), child.wait_with_output()).await;
+        let res = timeout(ACEDRG_TIMEOUT, child.wait_with_output()).await;
         let _res = addr.send(WorkerResult(res)).await;
         log::info!("JobRunner:job:{} - Worker terminates", id);
     }

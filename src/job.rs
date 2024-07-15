@@ -7,6 +7,7 @@ use std::{collections::BTreeMap, time::Duration};
 pub mod job_runner;
 
 pub const ACEDRG_OUTPUT_FILENAME: &'static str = "acedrg_output";
+pub const ACEDRG_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JobOutput {
@@ -109,7 +110,7 @@ impl Handler<NewJob> for JobManager {
                     // Make sure to keep this longer than the job timeout
                     // We don't have to care if the job is still running or not.
                     // In the worst-case scenario, it should have timed-out a long time ago.
-                    ctx.notify_later(RemoveJob(jid.clone()), Duration::from_secs(15 * 60));
+                    ctx.notify_later(RemoveJob(jid.clone()), ACEDRG_TIMEOUT * 2);
 
                     log::info!("Added job with ID={}", &jid);
                     (jid, job)
