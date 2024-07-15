@@ -1,4 +1,4 @@
-use super::messages::JobId;
+use super::messages::{AcedrgArgs,JobId};
 use actix::prelude::*;
 // use futures_util::FutureExt;
 use job_runner::JobRunner;
@@ -47,9 +47,9 @@ impl Actor for JobManager {
     type Context = Context<Self>;
 }
 
-pub struct AddJob(pub Addr<JobRunner>);
-impl Message for AddJob {
-    type Result = JobId;
+pub struct NewJob(pub AcedrgArgs);
+impl Message for NewJob {
+    type Result = std::io::Result<(JobId, Addr<JobRunner>)>;
 }
 
 pub struct QueryJob(pub JobId);
@@ -80,23 +80,38 @@ impl Handler<RemoveJob> for JobManager {
     }
 }
 
-impl Handler<AddJob> for JobManager {
-    type Result = <AddJob as actix::Message>::Result;
+impl Handler<NewJob> for JobManager {
+    type Result = ResponseActFuture<Self, <NewJob as actix::Message>::Result>;
 
-    fn handle(&mut self, msg: AddJob, ctx: &mut Self::Context) -> Self::Result {
-        let new_id = uuid::Uuid::new_v4();
-        let id = new_id.to_string();
-        self.jobs.insert(id.clone(), msg.0);
+    fn handle(&mut self, msg: NewJob, _ctx: &mut Self::Context) -> Self::Result {
+        let id = loop {
+            let new_id = uuid::Uuid::new_v4();
+            let id = new_id.to_string();
+            if ! self.jobs.contains_key(&id) {
+                break id;
+            }
+        };
+        Box::pin(async move {
+            let args = msg.0;
+            // todo: sanitize input in create_job()!!!
 
-        // Cleanup task
-        // Make sure to keep this longer than the job timeout
-        // We don't have to care if the job is still running or not.
-        // In the worst-case scenario, it should have timed-out a long time ago.
-        ctx.notify_later(RemoveJob(id.clone()), Duration::from_secs(15 * 60));
+            JobRunner::create_job(id.clone(), vec![], &args).await
+                .map(|addr| (id, addr))
+            // Err::<(String, Addr<JobRunner>), std::io::Error>(std::io::Error::new(std::io::ErrorKind::Other, "j"))
+        }.into_actor(self).map(|job_res, _actor , ctx| {
+            job_res.map(|(jid, job)| {
+                self.jobs.insert(jid.clone(), job.clone());
 
-        log::info!("Added job with ID={}", &id);
-
-        id
+                // Cleanup task
+                // Make sure to keep this longer than the job timeout
+                // We don't have to care if the job is still running or not.
+                // In the worst-case scenario, it should have timed-out a long time ago.
+                ctx.notify_later(RemoveJob(jid.clone()), Duration::from_secs(15 * 60));
+        
+                log::info!("Added job with ID={}", &jid);
+                (jid, job)
+            })
+        }))
     }
 }
 

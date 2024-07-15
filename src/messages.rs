@@ -4,7 +4,7 @@ use crate::job::JobStatus;
 
 pub type JobId = String;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AcedrgArgs {
     pub smiles: String,
     pub commandline_args: Vec<String>,

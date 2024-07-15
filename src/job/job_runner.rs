@@ -26,6 +26,7 @@ pub struct OutputPathRequest {
 }
 
 pub struct JobRunner {
+    id: String,
     data: JobData,
     workdir: WorkDir,
     /// Event propagation
@@ -125,6 +126,7 @@ impl JobRunner {
     }
 
     pub async fn create_job(
+        id: String,
         recipients: Vec<Recipient<JobData>>,
         args: &AcedrgArgs,
     ) -> std::io::Result<Addr<JobRunner>> {
@@ -145,6 +147,7 @@ impl JobRunner {
             .spawn()?;
 
         let ret = Self {
+            id,
             workdir,
             data: JobData {
                 status: JobStatus::Pending,
