@@ -62,6 +62,7 @@ impl Handler<WorkerResult> for JobRunner {
     type Result = ();
 
     fn handle(&mut self, msg: WorkerResult, _ctx: &mut Self::Context) -> Self::Result {
+        //log::debug!("JobRunner got result {:?}", &msg.0);
         match msg.0 {
             Err(_elapsed) => {
                 self.data.status = JobStatus::Failed(JobFailureReason::TimedOut);
@@ -81,6 +82,7 @@ impl Handler<WorkerResult> for JobRunner {
                 });
             }
         }
+        log::info!("JobRunner - job status updated: {:?}", &self.data.status);
         for i in &self.recipients {
             i.do_send(self.data.clone());
         }
@@ -100,8 +102,10 @@ impl Handler<OutputPathRequest> for JobRunner {
 
 impl JobRunner {
     async fn worker(child: Child, addr: Addr<Self>) {
+        log::info!("Started JobRunner worker.");
         let res = timeout(Duration::from_secs(5 * 60), child.wait_with_output()).await;
         let _res = addr.send(WorkerResult(res)).await;
+        log::info!("JobRunner worker terminates.");
     }
     async fn open_output_file(
         kind: OutputKind,
