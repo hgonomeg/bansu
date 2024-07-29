@@ -169,7 +169,7 @@ impl JobRunner {
         let ret = Self {
             id: id.clone(),
             workdir,
-            job_object: Box::from(AcedrgJob),
+            job_object: Box::from(AcedrgJob { args: args.clone() }),
             data: JobData {
                 status: JobStatus::Pending,
                 job_output: None,

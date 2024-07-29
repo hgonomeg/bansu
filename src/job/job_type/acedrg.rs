@@ -1,7 +1,10 @@
 use super::{Job, JobType};
+use crate::AcedrgArgs;
 use std::time::Duration;
 
-pub struct AcedrgJob;
+pub struct AcedrgJob {
+    pub args: AcedrgArgs,
+}
 
 impl Job for AcedrgJob {
     fn name(&self) -> &'static str {
