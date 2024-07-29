@@ -5,6 +5,7 @@ use job_runner::JobRunner;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, time::Duration};
 pub mod job_runner;
+pub mod job_type;
 
 pub const ACEDRG_OUTPUT_FILENAME: &'static str = "acedrg_output";
 pub const ACEDRG_TIMEOUT: Duration = Duration::from_secs(2 * 60);
