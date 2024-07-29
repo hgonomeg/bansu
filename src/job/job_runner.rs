@@ -1,3 +1,5 @@
+use super::job_type::acedrg::AcedrgJob;
+use super::job_type::Job;
 use super::{JobData, JobFailureReason, JobOutput, JobStatus, ACEDRG_OUTPUT_FILENAME};
 use crate::job::ACEDRG_TIMEOUT;
 use crate::ws_connection::WsConnection;
@@ -31,6 +33,7 @@ pub struct JobRunner {
     id: String,
     data: JobData,
     workdir: WorkDir,
+    job_object: Box<dyn Job>,
     /// Event propagation
     websocket_addrs: Vec<Addr<WsConnection>>,
 }
@@ -166,6 +169,7 @@ impl JobRunner {
         let ret = Self {
             id: id.clone(),
             workdir,
+            job_object: Box::from(AcedrgJob),
             data: JobData {
                 status: JobStatus::Pending,
                 job_output: None,

@@ -35,7 +35,7 @@ pub struct JobData {
     pub status: JobStatus,
     /// Gets filled when the job completes.
     /// If the job fails, it will only be filled
-    /// if the error came from acedrg itself
+    /// if the error came from the job executable itself
     pub job_output: Option<JobOutput>,
 }
 impl Message for JobData {
