@@ -19,4 +19,8 @@ impl Job for AcedrgJob {
     fn job_type(&self) -> JobType {
         JobType::Acedrg
     }
+
+    fn executable_name(&self) -> &'static str {
+        "acedrg"
+    }
 }
