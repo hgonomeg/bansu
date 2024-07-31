@@ -7,7 +7,8 @@ use actix_web::{
 use actix_web_actors::ws;
 pub mod job;
 use job::{
-    job_runner::{OutputKind, OutputPathRequest, OutputRequestError},
+    job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
+    job_type::acedrg::AcedrgJob,
     JobManager, LookupJob, NewJob,
 };
 pub mod messages;
@@ -28,7 +29,7 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
     };
 
     let file_res = job
-        .send(OutputPathRequest {
+        .send(OutputFileRequest {
             kind: OutputKind::CIF,
         })
         .await
@@ -41,6 +42,10 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
         }
         Err(OutputRequestError::JobStillPending) => {
             log::warn!("/get_cif/{} - Job is still pending.", job_id);
+            HttpResponse::BadRequest().finish()
+        }
+        Err(OutputRequestError::OutputKindNotSupported) => {
+            log::error!("/get_cif/{} - This job does not support CIF output", job_id);
             HttpResponse::BadRequest().finish()
         }
         Ok(mut file) => {
@@ -99,16 +104,17 @@ async fn run_acedrg(
     job_manager: web::Data<Addr<JobManager>>,
 ) -> HttpResponse {
     let args = args.into_inner();
+    let jo = Box::from(AcedrgJob { args });
 
-    match job_manager.send(NewJob(args)).await.unwrap() {
-        Ok((job_id, _new_job)) => HttpResponse::Created().json(AcedrgSpawnReply {
+    match job_manager.send(NewJob(jo)).await.unwrap() {
+        Ok((job_id, _new_job)) => HttpResponse::Created().json(JobSpawnReply {
             job_id: Some(job_id),
             error_message: None,
         }),
         Err(e) => {
             log::error!("/run_acedrg - {}", &e);
             // todo: different error types?
-            HttpResponse::InternalServerError().json(AcedrgSpawnReply {
+            HttpResponse::InternalServerError().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some(e.to_string()),
             })

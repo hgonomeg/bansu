@@ -1,15 +1,12 @@
-use super::messages::{AcedrgArgs, JobId};
+use super::messages::JobId;
 use actix::prelude::*;
 // use futures_util::FutureExt;
 use job_runner::JobRunner;
-use job_type::acedrg::AcedrgJob;
+use job_type::Job;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, time::Duration};
+use std::collections::BTreeMap;
 pub mod job_runner;
 pub mod job_type;
-
-pub const ACEDRG_OUTPUT_FILENAME: &'static str = "acedrg_output";
-pub const ACEDRG_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JobOutput {
@@ -51,7 +48,7 @@ impl Actor for JobManager {
     type Context = Context<Self>;
 }
 
-pub struct NewJob(pub AcedrgArgs);
+pub struct NewJob(pub Box<dyn Job>);
 impl Message for NewJob {
     type Result = std::io::Result<(JobId, Addr<JobRunner>)>;
 }
@@ -95,17 +92,16 @@ impl Handler<NewJob> for JobManager {
                 break id;
             }
         };
+        let tm = msg.0.timeout_value();
         Box::pin(
             async move {
-                let args = msg.0;
-                // for now
-                let job_object = Box::from(AcedrgJob { args });
+                let job_object = msg.0;
                 JobRunner::create_job(id.clone(), job_object)
                     .await
                     .map(|addr| (id, addr))
             }
             .into_actor(self)
-            .map(|job_res, actor, ctx| {
+            .map(move |job_res, actor, ctx| {
                 job_res.map(|(jid, job)| {
                     actor.jobs.insert(jid.clone(), job.clone());
 
@@ -113,7 +109,7 @@ impl Handler<NewJob> for JobManager {
                     // Make sure to keep this longer than the job timeout
                     // We don't have to care if the job is still running or not.
                     // In the worst-case scenario, it should have timed-out a long time ago.
-                    ctx.notify_later(RemoveJob(jid.clone()), ACEDRG_TIMEOUT * 2);
+                    ctx.notify_later(RemoveJob(jid.clone()), tm * 2);
 
                     log::info!("Added job with ID={}", &jid);
                     (jid, job)

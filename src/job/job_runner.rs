@@ -1,10 +1,10 @@
 use super::job_type::Job;
-use super::{JobData, JobFailureReason, JobOutput, JobStatus, ACEDRG_OUTPUT_FILENAME};
-use crate::job::ACEDRG_TIMEOUT;
+use super::{JobData, JobFailureReason, JobOutput, JobStatus};
 use crate::utils::*;
 use crate::ws_connection::WsConnection;
 use actix::prelude::*;
 use std::process::Output;
+use std::time::Duration;
 use tokio::process::Child;
 
 use thiserror::Error;
@@ -20,9 +20,11 @@ pub enum OutputRequestError {
     IOError(#[from] std::io::Error),
     #[error("Job is still running")]
     JobStillPending,
+    #[error("This output kind is not supported by this job type")]
+    OutputKindNotSupported,
 }
 
-pub struct OutputPathRequest {
+pub struct OutputFileRequest {
     pub kind: OutputKind,
 }
 
@@ -39,7 +41,7 @@ impl Actor for JobRunner {
     type Context = Context<Self>;
 }
 
-impl Message for OutputPathRequest {
+impl Message for OutputFileRequest {
     type Result = Result<tokio::fs::File, OutputRequestError>;
 }
 
@@ -108,10 +110,10 @@ impl Handler<WorkerResult> for JobRunner {
     }
 }
 
-impl Handler<OutputPathRequest> for JobRunner {
-    type Result = ResponseActFuture<Self, <OutputPathRequest as actix::Message>::Result>;
+impl Handler<OutputFileRequest> for JobRunner {
+    type Result = ResponseActFuture<Self, <OutputFileRequest as actix::Message>::Result>;
 
-    fn handle(&mut self, msg: OutputPathRequest, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: OutputFileRequest, _ctx: &mut Self::Context) -> Self::Result {
         if self.data.status == JobStatus::Pending {
             log::info!(
                 "JobRunner:job:{} - Turning down request for output - the job is still pending.",
@@ -119,31 +121,33 @@ impl Handler<OutputPathRequest> for JobRunner {
             );
             return Box::pin(async { Err(OutputRequestError::JobStillPending) }.into_actor(self));
         }
-        Box::pin(Self::open_output_file(msg.kind, self.workdir.path.clone()).into_actor(self))
+        let Some(filepath) = self
+            .job_object
+            .output_filename(&self.workdir.path, msg.kind)
+        else {
+            return Box::pin(
+                async { Err(OutputRequestError::OutputKindNotSupported) }.into_actor(self),
+            );
+        };
+
+        Box::pin(
+            async move {
+                Ok(tokio::fs::OpenOptions::new()
+                    .read(true)
+                    .open(filepath)
+                    .await?)
+            }
+            .into_actor(self),
+        )
     }
 }
 
 impl JobRunner {
-    async fn worker(child: Child, addr: Addr<Self>, id: String) {
+    async fn worker(child: Child, addr: Addr<Self>, id: String, timeout_value: Duration) {
         log::info!("JobRunner:job:{} - Started worker", &id);
-        let res = timeout(ACEDRG_TIMEOUT, child.wait_with_output()).await;
+        let res = timeout(timeout_value, child.wait_with_output()).await;
         let _res = addr.send(WorkerResult(res)).await;
         log::info!("JobRunner:job:{} - Worker terminates", id);
-    }
-    async fn open_output_file(
-        kind: OutputKind,
-        workdir_filepath: std::path::PathBuf,
-    ) -> Result<tokio::fs::File, OutputRequestError> {
-        let mut filepath = workdir_filepath;
-        match kind {
-            OutputKind::CIF => {
-                filepath.push(format!("{}.cif", ACEDRG_OUTPUT_FILENAME));
-            }
-        }
-        Ok(tokio::fs::OpenOptions::new()
-            .read(true)
-            .open(filepath)
-            .await?)
     }
 
     pub async fn create_job(
@@ -151,8 +155,9 @@ impl JobRunner {
         job_object: Box<dyn Job>,
     ) -> std::io::Result<Addr<JobRunner>> {
         let workdir = mkworkdir().await?;
-        let smiles_file_path = job_object.write_input(&workdir.path).await?;
-        let child = job_object.launch(&workdir.path, &smiles_file_path)?;
+        let input_path = job_object.write_input(&workdir.path).await?;
+        let child = job_object.launch(&workdir.path, &input_path)?;
+        let timeout_val = job_object.timeout_value();
 
         let ret = Self {
             id: id.clone(),
@@ -166,7 +171,7 @@ impl JobRunner {
         };
 
         Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {
-            let worker = JobRunner::worker(child, ctx.address(), id);
+            let worker = JobRunner::worker(child, ctx.address(), id, timeout_val);
             let fut = actix::fut::wrap_future(worker);
             ctx.spawn(fut);
             ret

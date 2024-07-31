@@ -1,0 +1,44 @@
+use super::{Job, JobType};
+use crate::job::job_runner::OutputKind;
+use std::path::{Path, PathBuf};
+
+pub struct ServalcatJob;
+
+impl Job for ServalcatJob {
+    fn name(&self) -> &'static str {
+        "Servalcat"
+    }
+
+    fn job_type(&self) -> JobType {
+        JobType::Servalcat
+    }
+
+    fn timeout_value(&self) -> std::time::Duration {
+        todo!()
+    }
+
+    fn output_filename(&self, _workdir_path: &Path, _kind: OutputKind) -> Option<PathBuf> {
+        todo!()
+    }
+
+    fn executable_name(&self) -> &'static str {
+        todo!()
+    }
+
+    fn launch(
+        &self,
+        _workdir_path: &std::path::Path,
+        _input_file_path: &std::path::Path,
+    ) -> std::io::Result<tokio::process::Child> {
+        todo!()
+    }
+
+    fn write_input<'a>(
+        &'a self,
+        _workdir_path: &'a std::path::Path,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = std::io::Result<std::path::PathBuf>> + 'a>,
+    > {
+        todo!()
+    }
+}

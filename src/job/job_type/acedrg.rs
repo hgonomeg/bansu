@@ -1,5 +1,6 @@
 use super::{Job, JobType};
-use crate::{job::ACEDRG_OUTPUT_FILENAME, utils::dump_string_to_file, AcedrgArgs};
+use crate::job::job_runner::OutputKind;
+use crate::{utils::dump_string_to_file, AcedrgArgs};
 use futures_util::Future;
 use std::process::Stdio;
 use std::{
@@ -8,6 +9,8 @@ use std::{
     time::Duration,
 };
 use tokio::process::{Child, Command};
+
+const ACEDRG_OUTPUT_FILENAME: &'static str = "acedrg_output";
 
 pub struct AcedrgJob {
     pub args: AcedrgArgs,
@@ -22,8 +25,11 @@ impl Job for AcedrgJob {
         Duration::from_secs(2 * 60)
     }
 
-    fn output_filename(&self) -> &'static str {
-        "acedrg_output"
+    fn output_filename(&self, workdir_path: &Path, kind: OutputKind) -> Option<PathBuf> {
+        match kind {
+            OutputKind::CIF => Some(workdir_path.join(format!("{}.cif", ACEDRG_OUTPUT_FILENAME))),
+            // _ => None
+        }
     }
 
     fn job_type(&self) -> JobType {

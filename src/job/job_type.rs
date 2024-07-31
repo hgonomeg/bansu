@@ -1,4 +1,3 @@
-pub mod acedrg;
 use futures_util::Future;
 use std::{
     path::{Path, PathBuf},
@@ -7,12 +6,18 @@ use std::{
 };
 use tokio::process::Child;
 
-pub trait Job {
+use super::job_runner::OutputKind;
+
+pub mod acedrg;
+pub mod servalcat;
+
+pub trait Job: Send {
     fn name(&self) -> &'static str;
     fn job_type(&self) -> JobType;
     fn timeout_value(&self) -> Duration;
-    fn output_filename(&self) -> &'static str;
+    fn output_filename(&self, workdir_path: &Path, kind: OutputKind) -> Option<PathBuf>;
     fn executable_name(&self) -> &'static str;
+    // This might need a redesign so that it combines writing input with launching
     fn launch(&self, workdir_path: &Path, input_file_path: &Path) -> std::io::Result<Child>;
     /// Returns path to the input file
     fn write_input<'a>(
@@ -25,4 +30,5 @@ pub trait Job {
 
 pub enum JobType {
     Acedrg,
+    Servalcat,
 }

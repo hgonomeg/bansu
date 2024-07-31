@@ -58,7 +58,7 @@ pub struct GenericErrorMessage {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct AcedrgSpawnReply {
+pub struct JobSpawnReply {
     pub job_id: Option<JobId>,
     pub error_message: Option<String>,
 }
