@@ -1,17 +1,14 @@
-use super::job_type::acedrg::AcedrgJob;
 use super::job_type::Job;
 use super::{JobData, JobFailureReason, JobOutput, JobStatus, ACEDRG_OUTPUT_FILENAME};
 use crate::job::ACEDRG_TIMEOUT;
+use crate::utils::*;
 use crate::ws_connection::WsConnection;
-use crate::{utils::*, AcedrgArgs};
 use actix::prelude::*;
 use std::process::Output;
-use std::process::Stdio;
+use tokio::process::Child;
+
 use thiserror::Error;
-use tokio::{
-    process::{Child, Command},
-    time::timeout,
-};
+use tokio::time::timeout;
 
 pub enum OutputKind {
     CIF,
@@ -149,27 +146,18 @@ impl JobRunner {
             .await?)
     }
 
-    pub async fn create_job(id: String, args: &AcedrgArgs) -> std::io::Result<Addr<JobRunner>> {
+    pub async fn create_job(
+        id: String,
+        job_object: Box<dyn Job>,
+    ) -> std::io::Result<Addr<JobRunner>> {
         let workdir = mkworkdir().await?;
-        let smiles_file_path = workdir.path.join("acedrg_smiles_input");
-        dump_string_to_file(&smiles_file_path, &args.smiles).await?;
-        let child = Command::new("acedrg")
-            .current_dir(&workdir.path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .arg("-i")
-            .arg(&smiles_file_path)
-            // TODO: SANITIZE INPUT!
-            .args(args.commandline_args.clone())
-            .arg("-o")
-            .arg(ACEDRG_OUTPUT_FILENAME)
-            .spawn()?;
+        let smiles_file_path = job_object.write_input(&workdir.path).await?;
+        let child = job_object.launch(&workdir.path, &smiles_file_path)?;
 
         let ret = Self {
             id: id.clone(),
             workdir,
-            job_object: Box::from(AcedrgJob { args: args.clone() }),
+            job_object,
             data: JobData {
                 status: JobStatus::Pending,
                 job_output: None,

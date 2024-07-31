@@ -2,6 +2,7 @@ use super::messages::{AcedrgArgs, JobId};
 use actix::prelude::*;
 // use futures_util::FutureExt;
 use job_runner::JobRunner;
+use job_type::acedrg::AcedrgJob;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, time::Duration};
 pub mod job_runner;
@@ -97,8 +98,9 @@ impl Handler<NewJob> for JobManager {
         Box::pin(
             async move {
                 let args = msg.0;
-                // todo: sanitize input in create_job()!!!
-                JobRunner::create_job(id.clone(), &args)
+                // for now
+                let job_object = Box::from(AcedrgJob { args });
+                JobRunner::create_job(id.clone(), job_object)
                     .await
                     .map(|addr| (id, addr))
             }
