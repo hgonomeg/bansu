@@ -28,8 +28,7 @@ Combined together gives us:
 
 ## Todo
 
-* Design an abstraction for representing different job types (different programs).
-  * Support for servalcat
-* Input validation!!!
 * Isolating jobs in containers
+* Input validation!!!
+* Support for servalcat
 * Think about API design for defining graph-like pipelines (if we ever need that)
