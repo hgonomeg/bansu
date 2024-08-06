@@ -5,9 +5,9 @@ initial_setup() {
     mkdir -p /download
     mkdir -p /build
     dnf update -y
-    dnf install -y git gcc gcc-c++ wget gunzip python python-devel \
+    dnf install -y git gcc gcc-c++ wget gzip python python-devel \
       boost boost-devel cmake pybind11-devel python-pybind11 meson \
-      gmake pip bison flex \
+      make pip bison flex \
       helix vim
     pip install setuptools numpy
 }
