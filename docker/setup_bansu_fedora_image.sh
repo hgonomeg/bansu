@@ -102,7 +102,7 @@ build_servalcat() {
   mkdir -p /build/servalcat
   cd /build/servalcat &&\
   rm -rf *
-  cmake -S /download/servalcat-${SERVALCAT_VER_VER} \
+  cmake -S /download/servalcat-${SERVALCAT_VER} \
   -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release 
   cmake --build . && cmake --install .
   cd ..
