@@ -38,7 +38,7 @@ download_all() {
     tar -xf gemmi-${GEMMI_VER}.tar.gz
 
     # Servalcat
-    do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz &&\
+    do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz -O servalcat-${SERVALCAT_VER}.tar.gz &&\
     tar -xf servalcat-${SERVALCAT_VER}.tar.gz
 
 }
