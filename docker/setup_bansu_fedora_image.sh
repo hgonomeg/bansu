@@ -4,14 +4,19 @@
 initial_setup() {
     mkdir -p /download
     mkdir -p /build
-    dnf install -y git gcc gcc-c++ wget gunzip python boost cmake pybind11-devel
+    dnf update -y
+    dnf install -y git gcc gcc-c++ wget gunzip python python-devel \
+      boost boost-devel cmake pybind11-devel meson \
+      gmake pip bison flex \
+      helix vim
+    pip install setuptools numpy
 }
 
 do_wget() {
   wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 "$@" || exit 7
 }
 
-RDKIT_VER=2024_03_2
+RDKIT_VER=2024_03_5
 GEMMI_VER=0.6.6
 SERVALCAT_VER=0.4.77
 
@@ -32,6 +37,10 @@ download_all() {
     do_wget https://github.com/project-gemmi/gemmi/archive/refs/tags/v${GEMMI_VER}.tar.gz -O gemmi-${GEMMI_VER}.tar.gz &&\
     tar -xf gemmi-${GEMMI_VER}.tar.gz
 
+    # Servalcat
+    do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz &&\
+    tar -xf servcalcat-${SERVALCAT_VER}.tar.gz
+
 }
 
 build_rdkit() {
@@ -42,6 +51,7 @@ build_rdkit() {
   -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release \
   -DRDK_BUILD_CAIRO_SUPPORT=OFF \
   -DRDK_BUILD_INCHI_SUPPORT=OFF \
+  -DRDK_BUILD_FREETYPE_SUPPORT=OFF \
   -DRDK_INSTALL_COMIC_FONTS=OFF \
   -DRDK_INSTALL_INTREE=OFF 
 
@@ -59,13 +69,13 @@ build_gemmi() {
   cd ..
 }
 
-build_acedrg() {
+# build_acedrg() {
+#   # something
+# }
 
-}
-
-build_servalcat() {
-
-}
+# build_servalcat() {
+#  # something
+# }
 
 
 build_all() {
@@ -73,14 +83,19 @@ build_all() {
     build_gemmi
     build_servalcat
     build_acedrg
+    echo duppa
 }
 
 cleanup_all() {
-
+ echo Removing /download
+ rm -rf /download
+ echo Removing /build
+ rm -rf /build
+ echo Cleanup done
 }
 
 initial_setup
 download_all
 build_all
-clenup_all
+# cleanup_all
 
