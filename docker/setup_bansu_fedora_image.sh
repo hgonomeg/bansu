@@ -12,6 +12,12 @@ initial_setup() {
       fftw2-devel fftw-devel \
       helix vim
     #pip install setuptools numpy
+
+    echo "#!/usr/bin/sh" > /usr/bin/ccp4-python
+    echo "export CCP4=/usr" >> /usr/bin/ccp4-python
+    echo "export CBIN=bin/" >> /usr/bin/ccp4-python
+    echo "exec /usr/bin/python3 \"$@\"" >> /usr/bin/ccp4-python
+    chmod +x /usr/bin/ccp4-python
 }
 
 do_wget() {
@@ -136,6 +142,6 @@ setup_all() {
   initial_setup
   download_all
   build_all
-  # cleanup_all
+  cleanup_all
 }
 
