@@ -1,0 +1,3 @@
+FROM fedora:41
+COPY setup_bansu_fedora_image.sh /setup_bansu_fedora_image.sh
+RUN /setup_bansu_fedora_image.sh
