@@ -5,11 +5,12 @@ initial_setup() {
     mkdir -p /download
     mkdir -p /build
     dnf update -y
-    dnf install -y git gcc gcc-c++ wget gzip python python-devel \
-      boost boost-devel cmake pybind11-devel python-pybind11 meson \
-      make pip bison flex \
+    dnf install -y git gcc gcc-c++ wget gzip \
+      python python-devel pybind11-devel python-pybind11 python-numpy python-setuptools meson \
+      boost boost-devel cmake \
+      make bison flex \
       helix vim
-    pip install setuptools numpy
+    #pip install setuptools numpy
 }
 
 do_wget() {
