@@ -21,6 +21,9 @@ RDKIT_VER=2024_03_5
 GEMMI_VER=0.6.6
 SERVALCAT_VER=0.4.77
 
+setup_build_env() {
+  export CMAKE_BUILD_PARALLEL_LEVEL=`nproc --all`
+}
 
 download_all() {
     cd /download
@@ -45,6 +48,7 @@ download_all() {
 }
 
 build_rdkit() {
+  setup_build_env
   mkdir -p /build/rdkit
   cd /build/rdkit &&\
   rm -rf *
@@ -61,6 +65,7 @@ build_rdkit() {
 }
 
 build_gemmi() {
+  setup_build_env
   mkdir -p /build/gemmi
   cd /build/gemmi &&\
   rm -rf *
@@ -70,13 +75,15 @@ build_gemmi() {
   cd ..
 }
 
-# build_acedrg() {
-#   # something
-# }
+build_acedrg() {
+  setup_build_env
+  # something
+}
 
-# build_servalcat() {
-#  # something
-# }
+build_servalcat() {
+  setup_build_env
+ # something
+}
 
 
 build_all() {
