@@ -9,6 +9,7 @@ initial_setup() {
       python python-devel pybind11-devel python-pybind11 python-numpy python-setuptools meson \
       boost boost-devel cmake \
       make bison flex \
+      fftw2-devel fftw-devel \
       helix vim
     #pip install setuptools numpy
 }
@@ -17,6 +18,7 @@ do_wget() {
   wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 "$@" || exit 7
 }
 
+LIBEIGEN_VER=3.4.0
 RDKIT_VER=2024_03_5
 GEMMI_VER=0.6.6
 SERVALCAT_VER=0.4.77
@@ -32,6 +34,10 @@ download_all() {
     do_wget https://ccp4forge.rc-harwell.ac.uk/ccp4/acedrg/-/archive/main/acedrg-main.tar.gz &&\
     tar -xf acedrg-main.tar.gz
 
+    # Libeigen
+    do_wget https://gitlab.com/libeigen/eigen/-/archive/${LIBEIGEN_VER}/eigen-${LIBEIGEN_VER}.tar.gz &&\
+    tar -xf eigen-${LIBEIGEN_VER}.tar.gz
+
     #RDKit
     do_wget https://github.com/rdkit/rdkit/archive/refs/tags/Release_${RDKIT_VER}.tar.gz &&\
     tar -xf Release_${RDKIT_VER}.tar.gz &&\
@@ -45,6 +51,17 @@ download_all() {
     do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz -O servalcat-${SERVALCAT_VER}.tar.gz &&\
     tar -xf servalcat-${SERVALCAT_VER}.tar.gz
 
+}
+
+build_eigen() {
+  setup_build_env
+  mkdir -p /build/eigen
+  cd /build/eigen &&\
+  rm -rf *
+  cmake -S /download/eigen-${LIBEIGEN_VER} \
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release 
+  cmake --build . && cmake --install .
+  cd ..
 }
 
 build_rdkit() {
@@ -82,11 +99,18 @@ build_acedrg() {
 
 build_servalcat() {
   setup_build_env
- # something
+  mkdir -p /build/servalcat
+  cd /build/servalcat &&\
+  rm -rf *
+  cmake -S /download/servalcat-${SERVALCAT_VER_VER} \
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release 
+  cmake --build . && cmake --install .
+  cd ..
 }
 
 
 build_all() {
+    build_eigen
     build_rdkit
     build_gemmi
     build_servalcat
@@ -102,8 +126,10 @@ cleanup_all() {
  echo Cleanup done
 }
 
-initial_setup
-download_all
-build_all
-# cleanup_all
+setup_all() {
+  initial_setup
+  download_all
+  build_all
+  # cleanup_all
+}
 
