@@ -39,7 +39,7 @@ download_all() {
 
     # Servalcat
     do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz &&\
-    tar -xf servcalcat-${SERVALCAT_VER}.tar.gz
+    tar -xf servalcat-${SERVALCAT_VER}.tar.gz
 
 }
 
