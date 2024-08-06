@@ -22,6 +22,7 @@ LIBEIGEN_VER=3.4.0
 RDKIT_VER=2024_03_5
 GEMMI_VER=0.6.6
 SERVALCAT_VER=0.4.77
+ACEDRG_VER=main
 
 setup_build_env() {
   export CMAKE_BUILD_PARALLEL_LEVEL=`nproc --all`
@@ -31,8 +32,8 @@ download_all() {
     cd /download
 
     # Acedrg
-    do_wget https://ccp4forge.rc-harwell.ac.uk/ccp4/acedrg/-/archive/main/acedrg-main.tar.gz &&\
-    tar -xf acedrg-main.tar.gz
+    do_wget https://ccp4forge.rc-harwell.ac.uk/ccp4/acedrg/-/archive/main/acedrg-${ACEDRG_VER}.tar.gz &&\
+    tar -xf acedrg-${ACEDRG_VER}.tar.gz
 
     # Libeigen
     do_wget https://gitlab.com/libeigen/eigen/-/archive/${LIBEIGEN_VER}/eigen-${LIBEIGEN_VER}.tar.gz &&\
@@ -94,7 +95,13 @@ build_gemmi() {
 
 build_acedrg() {
   setup_build_env
-  # something
+  mkdir -p /build/acedrg
+  cd /build/acedrg &&\
+  rm -rf *
+  cmake -S /download/acedrg-${ACEDRG_VER} \
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release 
+  cmake --build . && cmake --install .
+  cd ..
 }
 
 build_servalcat() {
@@ -115,7 +122,6 @@ build_all() {
     build_gemmi
     build_servalcat
     build_acedrg
-    echo duppa
 }
 
 cleanup_all() {
