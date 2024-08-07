@@ -128,6 +128,9 @@ build_all() {
     build_gemmi
     build_servalcat
     build_acedrg
+
+    # Seems to be necessary for RDKit stuff to be found at runtime
+    ldconfig
 }
 
 cleanup_all() {
