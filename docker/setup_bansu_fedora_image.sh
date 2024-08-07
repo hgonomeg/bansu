@@ -18,6 +18,10 @@ initial_setup() {
     echo "export CBIN=bin/" >> /usr/bin/ccp4-python
     echo "exec /usr/bin/python3 \"\$@\"" >> /usr/bin/ccp4-python
     chmod +x /usr/bin/ccp4-python
+
+    echo "#!/usr/bin/sh" > /usr/bin/servalcat
+    echo "exec /usr/bin/python3 -m servalcat \"\$@\"" >> /usr/bin/servalcat
+    chmod +x /usr/bin/servalcat
 }
 
 do_wget() {
