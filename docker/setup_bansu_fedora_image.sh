@@ -6,7 +6,7 @@ initial_setup() {
     mkdir -p /build
     dnf update -y
     dnf install -y git gcc gcc-c++ wget gzip \
-      python python-devel pybind11-devel python-pybind11 python-numpy python-setuptools meson \
+      python python-devel pybind11-devel python-pybind11 python-numpy python-setuptools python-pandas python-scipy meson \
       boost boost-devel cmake \
       make bison flex \
       fftw2-devel fftw-devel \
