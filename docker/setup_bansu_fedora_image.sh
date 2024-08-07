@@ -10,7 +10,7 @@ initial_setup() {
       boost boost-devel cmake \
       make bison flex \
       fftw2-devel fftw-devel \
-      helix vim
+      helix vim fd-find ag
     #pip install setuptools numpy
 
     echo "#!/usr/bin/sh" > /usr/bin/ccp4-python
