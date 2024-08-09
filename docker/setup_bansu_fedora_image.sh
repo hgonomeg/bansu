@@ -5,7 +5,7 @@ initial_setup() {
     mkdir -p /download
     mkdir -p /build
     dnf update -y
-    dnf install -y git gcc gcc-c++ wget gzip \
+    dnf install -y git bzr gcc gcc-c++ wget gzip \
       python python-devel pybind11-devel python-pybind11 python-numpy python-setuptools python-pandas python-scipy meson \
       boost boost-devel cmake \
       make bison flex \
