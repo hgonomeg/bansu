@@ -50,7 +50,7 @@ impl Actor for JobManager {
 
 pub struct NewJob(pub Box<dyn Job>);
 impl Message for NewJob {
-    type Result = std::io::Result<(JobId, Addr<JobRunner>)>;
+    type Result = anyhow::Result<(JobId, Addr<JobRunner>)>;
 }
 
 pub struct LookupJob(pub JobId);

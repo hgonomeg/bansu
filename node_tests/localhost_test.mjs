@@ -32,6 +32,11 @@ const postData = JSON.stringify({
       try {
         const jsonData = JSON.parse(data);
         console.log("Got json: ", jsonData);
+        if(jsonData.job_id === null) {
+          console.error("Server returned null job id. Error message is: ", jsonData.error_message);
+          console.log("Exiting");
+          process.exit(4);
+        }
         console.log("Establishing WebSocket connection.");
         // Create WebSocket connection.
         const socket = new WebSocket(`ws://localhost:8080/ws/${jsonData.job_id}`);

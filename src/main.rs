@@ -113,11 +113,11 @@ async fn run_acedrg(
             error_message: None,
         }),
         Err(e) => {
-            log::error!("/run_acedrg - {}", &e);
+            log::error!("/run_acedrg - Could not create job: {:#}", &e);
             // todo: different error types?
             HttpResponse::InternalServerError().json(JobSpawnReply {
                 job_id: None,
-                error_message: Some(e.to_string()),
+                error_message: Some(format!("{:#}", e)),
             })
         }
     }

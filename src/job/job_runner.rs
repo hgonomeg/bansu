@@ -3,6 +3,7 @@ use super::{JobData, JobFailureReason, JobOutput, JobStatus};
 use crate::utils::*;
 use crate::ws_connection::WsConnection;
 use actix::prelude::*;
+use anyhow::Context as AnyhowContext;
 use std::process::Output;
 use std::time::Duration;
 use tokio::process::Child;
@@ -149,11 +150,18 @@ impl JobRunner {
     pub async fn create_job(
         id: String,
         job_object: Box<dyn Job>,
-    ) -> std::io::Result<Addr<JobRunner>> {
-        let workdir = mkworkdir().await?;
-        let input_path = job_object.write_input(&workdir.path).await?;
+    ) -> anyhow::Result<Addr<JobRunner>> {
+        let workdir = mkworkdir()
+            .await
+            .with_context(|| "Could not create working directory")?;
+        let input_path = job_object
+            .write_input(&workdir.path)
+            .await
+            .with_context(|| "Could not write input for job")?;
         log::info!("{} - Lauching child process.", &id);
-        let child = job_object.launch(&workdir.path, &input_path)?;
+        let child = job_object
+            .launch(&workdir.path, &input_path)
+            .with_context(|| "Could not launch child process")?;
         let timeout_val = job_object.timeout_value();
 
         let ret = Self {
