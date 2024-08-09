@@ -95,6 +95,7 @@ async fn job_ws(
         return Ok(HttpResponse::NotFound().finish());
     };
     let jm = job_manager.get_ref().clone();
+    // log::info!("/ws/{} - Establishing ws connection", &job_id);
     ws::start(WsConnection::new(jm, job, job_id), &req, stream)
 }
 
