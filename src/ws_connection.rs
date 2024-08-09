@@ -20,11 +20,20 @@ impl Handler<JobData> for WsConnection {
     fn handle(&mut self, msg: JobData, ctx: &mut Self::Context) -> Self::Result {
         log::info!("Sending JobDataUpdate for job {}", self.job_id);
         ctx.text(serde_json::to_string(&WsJobDataUpdate::from(msg.clone())).unwrap());
-        if msg.status == JobStatus::Finished {
-            ctx.close(Some(CloseReason {
-                code: CloseCode::Normal,
-                description: None,
-            }));
+        match msg.status {
+            JobStatus::Finished => {
+                ctx.close(Some(CloseReason {
+                    code: CloseCode::Normal,
+                    description: None,
+                }));
+            }
+            JobStatus::Failed(_e) => {
+                ctx.close(Some(CloseReason {
+                    code: CloseCode::Error,
+                    description: None,
+                }));
+            }
+            _ => (),
         }
     }
 }
