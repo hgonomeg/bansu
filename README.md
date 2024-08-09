@@ -26,7 +26,7 @@ The (current) default timeout for `Acedrg` is 2 minutes.
 
 The server exposes the following API:
 
-### HTTP POST `/run_acedrg"`
+### HTTP POST `/run_acedrg`
 
 Creates `Acedrg` job.
 Accepts the following JSON payload:
