@@ -99,11 +99,7 @@ impl Handler<WorkerResult> for JobRunner {
                 });
             }
         }
-        log::info!(
-            "JobRunner:job:{} - Status updated: {:?}",
-            self.id,
-            &self.data.status
-        );
+        log::info!("{} - Status updated: {:?}", self.id, &self.data.status);
         for i in &self.websocket_addrs {
             i.do_send(self.data.clone());
         }
@@ -116,7 +112,7 @@ impl Handler<OutputFileRequest> for JobRunner {
     fn handle(&mut self, msg: OutputFileRequest, _ctx: &mut Self::Context) -> Self::Result {
         if self.data.status == JobStatus::Pending {
             log::info!(
-                "JobRunner:job:{} - Turning down request for output - the job is still pending.",
+                "{} - Turning down request for output - the job is still pending.",
                 self.id
             );
             return Box::pin(async { Err(OutputRequestError::JobStillPending) }.into_actor(self));
@@ -144,10 +140,10 @@ impl Handler<OutputFileRequest> for JobRunner {
 
 impl JobRunner {
     async fn worker(child: Child, addr: Addr<Self>, id: String, timeout_value: Duration) {
-        log::info!("JobRunner:job:{} - Started worker", &id);
+        log::info!("{} - Started worker", &id);
         let res = timeout(timeout_value, child.wait_with_output()).await;
         let _res = addr.send(WorkerResult(res)).await;
-        log::info!("JobRunner:job:{} - Worker terminates", id);
+        log::info!("{} - Worker terminates", id);
     }
 
     pub async fn create_job(
@@ -156,6 +152,7 @@ impl JobRunner {
     ) -> std::io::Result<Addr<JobRunner>> {
         let workdir = mkworkdir().await?;
         let input_path = job_object.write_input(&workdir.path).await?;
+        log::info!("{} - Lauching child process.", &id);
         let child = job_object.launch(&workdir.path, &input_path)?;
         let timeout_val = job_object.timeout_value();
 
