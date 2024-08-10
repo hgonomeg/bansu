@@ -32,7 +32,8 @@ LIBEIGEN_VER=3.4.0
 RDKIT_VER=2024_03_5
 GEMMI_VER=0.6.6
 SERVALCAT_VER=0.4.77
-ACEDRG_VER=main
+# ACEDRG_VER=main
+ACEDRG_VER=bzr
 
 setup_build_env() {
   export CMAKE_BUILD_PARALLEL_LEVEL=`nproc --all`
@@ -42,8 +43,10 @@ download_all() {
     cd /download
 
     # Acedrg
-    do_wget https://ccp4forge.rc-harwell.ac.uk/ccp4/acedrg/-/archive/main/acedrg-${ACEDRG_VER}.tar.gz &&\
-    tar -xf acedrg-${ACEDRG_VER}.tar.gz
+    # do_wget https://ccp4forge.rc-harwell.ac.uk/ccp4/acedrg/-/archive/main/acedrg-${ACEDRG_VER}.tar.gz &&\
+    # tar -xf acedrg-${ACEDRG_VER}.tar.gz
+    bzr checkout https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/ acedrg-${ACEDRG_VER} || exit 7
+
 
     # Libeigen
     do_wget https://gitlab.com/libeigen/eigen/-/archive/${LIBEIGEN_VER}/eigen-${LIBEIGEN_VER}.tar.gz &&\
