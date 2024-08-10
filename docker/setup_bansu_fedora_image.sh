@@ -46,6 +46,7 @@ download_all() {
     # Acedrg
     # do_wget https://ccp4forge.rc-harwell.ac.uk/ccp4/acedrg/-/archive/main/acedrg-${ACEDRG_VER}.tar.gz &&\
     # tar -xf acedrg-${ACEDRG_VER}.tar.gz
+    echo Checking-out acedrg with breezy...
     brz checkout https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/ acedrg-${ACEDRG_VER} || exit 7
 
 
