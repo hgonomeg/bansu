@@ -5,13 +5,14 @@ initial_setup() {
     mkdir -p /download
     mkdir -p /build
     dnf update -y
-    dnf install -y git bzr gcc gcc-c++ wget gzip \
+    dnf install -y git rust cargo gcc gcc-c++ wget gzip \
       python python-devel pybind11-devel python-pybind11 python-numpy python-setuptools python-pandas python-scipy meson \
       boost boost-devel cmake \
       make bison flex \
       fftw2-devel fftw-devel \
       helix vim fd-find ag
-    #pip install setuptools numpy
+    # The version shipped with Fedora is broken
+    pip install breezy
 
     echo "#!/usr/bin/sh" > /usr/bin/ccp4-python
     echo "export CCP4=/usr" >> /usr/bin/ccp4-python
@@ -45,7 +46,7 @@ download_all() {
     # Acedrg
     # do_wget https://ccp4forge.rc-harwell.ac.uk/ccp4/acedrg/-/archive/main/acedrg-${ACEDRG_VER}.tar.gz &&\
     # tar -xf acedrg-${ACEDRG_VER}.tar.gz
-    bzr checkout https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/ acedrg-${ACEDRG_VER} || exit 7
+    brz checkout https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/ acedrg-${ACEDRG_VER} || exit 7
 
 
     # Libeigen
