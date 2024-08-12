@@ -68,7 +68,7 @@ download_all() {
     do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz -O servalcat-${SERVALCAT_VER}.tar.gz &&\
     tar -xf servalcat-${SERVALCAT_VER}.tar.gz
 
-    cd Getting the monomer library...
+    echo Getting the monomer library...
     cd /usr/share
     git clone https://github.com/MonomerLibrary/monomers || exit 7
 
