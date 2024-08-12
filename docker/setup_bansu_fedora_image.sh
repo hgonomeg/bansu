@@ -17,6 +17,7 @@ initial_setup() {
     echo "#!/usr/bin/sh" > /usr/bin/ccp4-python
     echo "export CCP4=/usr" >> /usr/bin/ccp4-python
     echo "export CBIN=/usr/bin/" >> /usr/bin/ccp4-python
+    echo "export CLIBD_MON=/usr/share/monomers" >> /usr/bin/ccp4-python
     echo "exec /usr/bin/python3 \"\$@\"" >> /usr/bin/ccp4-python
     chmod +x /usr/bin/ccp4-python
 
@@ -66,6 +67,11 @@ download_all() {
     # Servalcat
     do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz -O servalcat-${SERVALCAT_VER}.tar.gz &&\
     tar -xf servalcat-${SERVALCAT_VER}.tar.gz
+
+    cd Getting the monomer library...
+    cd /usr/share
+    git clone https://github.com/MonomerLibrary/monomers || exit 7
+
 
 }
 
