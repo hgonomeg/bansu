@@ -13,16 +13,16 @@ pub enum JobStatusInfo {
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum JobFailureInfo {
     TimedOut,
-    AcedrgError,
-    IOError,
+    JobProcessError,
+    SetupError,
 }
 
 impl From<&JobFailureReason> for JobFailureInfo {
     fn from(value: &JobFailureReason) -> Self {
         match value {
             JobFailureReason::TimedOut => JobFailureInfo::TimedOut,
-            JobFailureReason::IOError(_) => JobFailureInfo::IOError,
-            JobFailureReason::AcedrgError => JobFailureInfo::AcedrgError,
+            JobFailureReason::SetupError(_) => JobFailureInfo::SetupError,
+            JobFailureReason::JobProcessError => JobFailureInfo::JobProcessError,
         }
     }
 }

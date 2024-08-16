@@ -85,7 +85,7 @@ Progress reports have the following JSON format:
         "stderr": "A string"
     },
     /// Only not-null if the job failed
-    "failure_reason": "TimedOut | AcedrgError | IOError"
+    "failure_reason": "TimedOut | JobProcessError | SetupError"
 }
 
 ```

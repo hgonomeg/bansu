@@ -1,3 +1,4 @@
+use super::job_handle::JobHandle;
 use super::job_type::Job;
 use super::{JobData, JobFailureReason, JobOutput, JobStatus};
 use crate::utils::*;
@@ -6,7 +7,6 @@ use actix::prelude::*;
 use anyhow::Context as AnyhowContext;
 use std::process::Output;
 use std::time::Duration;
-use tokio::process::Child;
 
 use thiserror::Error;
 use tokio::time::timeout;
@@ -59,7 +59,7 @@ impl Handler<AddWebSocketAddr> for JobRunner {
     }
 }
 
-struct WorkerResult(Result<std::io::Result<Output>, tokio::time::error::Elapsed>);
+struct WorkerResult(Result<anyhow::Result<Output>, tokio::time::error::Elapsed>);
 impl Message for WorkerResult {
     type Result = ();
 }
@@ -86,13 +86,14 @@ impl Handler<WorkerResult> for JobRunner {
                 self.data.status = JobStatus::Failed(JobFailureReason::TimedOut);
             }
             Ok(Err(e)) => {
-                self.data.status = JobStatus::Failed(JobFailureReason::IOError(e.kind()));
+                self.data.status =
+                    JobStatus::Failed(JobFailureReason::SetupError(format!("{:#}", e)));
             }
             Ok(Ok(output)) => {
                 self.data.status = if output.status.success() {
                     JobStatus::Finished
                 } else {
-                    JobStatus::Failed(JobFailureReason::AcedrgError)
+                    JobStatus::Failed(JobFailureReason::JobProcessError)
                 };
                 self.data.job_output = Some(JobOutput {
                     stderr: String::from_utf8_lossy(&output.stderr).to_string(),
@@ -140,9 +141,9 @@ impl Handler<OutputFileRequest> for JobRunner {
 }
 
 impl JobRunner {
-    async fn worker(child: Child, addr: Addr<Self>, id: String, timeout_value: Duration) {
+    async fn worker(handle: JobHandle, addr: Addr<Self>, id: String, timeout_value: Duration) {
         log::info!("{} - Started worker", &id);
-        let res = timeout(timeout_value, child.wait_with_output()).await;
+        let res = timeout(timeout_value, handle.join()).await;
         let _res = addr.send(WorkerResult(res)).await;
         log::info!("{} - Worker terminates", id);
     }
@@ -177,7 +178,8 @@ impl JobRunner {
         };
 
         Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {
-            let worker = JobRunner::worker(child, ctx.address(), id, timeout_val);
+            let worker =
+                JobRunner::worker(JobHandle::Direct(child), ctx.address(), id, timeout_val);
             let fut = actix::fut::wrap_future(worker);
             ctx.spawn(fut);
             ret

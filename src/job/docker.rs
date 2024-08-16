@@ -10,7 +10,10 @@ use bollard::{
 use futures_util::StreamExt;
 use uuid::Uuid;
 
-async fn test_docker_impl(image_name: &str, commands: Vec<&str>) -> anyhow::Result<ContainerHandleOutput> {
+async fn test_docker_impl(
+    image_name: &str,
+    commands: Vec<&str>,
+) -> anyhow::Result<ContainerHandleOutput> {
     let container = ContainerHandle::new(&image_name, commands, "/").await?;
     let output = container.run().await?;
     if output.exit_info.status_code != 0 {
@@ -34,7 +37,7 @@ pub async fn test_docker(image_name: &str) -> anyhow::Result<()> {
     );
     let acedrg_output = acedrg_res?;
     let servalcat_output = servalcat_res?;
-    
+
     log::info!(
         "Output of 'acedrg -v' is {}\n{}",
         String::from_utf8_lossy(&acedrg_output.output.stdout),
@@ -99,7 +102,11 @@ impl ContainerHandle {
             .await
             .with_context(|| "Could not create Docker container")?;
 
-        log::info!("Created Docker container with id={} name={}", &container.id, &container_name);
+        log::info!(
+            "Created Docker container with id={} name={}",
+            &container.id,
+            &container_name
+        );
 
         Ok(Self {
             docker,

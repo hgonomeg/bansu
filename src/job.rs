@@ -26,8 +26,8 @@ pub enum JobStatus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JobFailureReason {
     TimedOut,
-    IOError(std::io::ErrorKind),
-    AcedrgError,
+    SetupError(String),
+    JobProcessError,
 }
 
 #[derive(Debug, Clone, MessageResponse)]
