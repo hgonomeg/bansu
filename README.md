@@ -33,9 +33,10 @@ in Docker containers.
 The following environment variables control the behavior of the server:
 
 * `TMPDIR` - can be used to specify location where jobs store temporary files
+* `RUST_LOG` - sets the log level
 * `BANSU_PORT` - sets the port to listen on
 * `BANSU_ADDRESS` - sets the address to listen on
-* `BANSU_DOCKER` - if defined, enables Docker support
+* `BANSU_DOCKER` - enables Docker support and sets the name of the Docker image used for running jobs.
 
 ### API
 

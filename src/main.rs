@@ -13,6 +13,7 @@ use job::{
     job_type::acedrg::AcedrgJob,
     JobManager, LookupJob, NewJob,
 };
+pub mod docker;
 pub mod messages;
 pub mod utils;
 pub mod ws_connection;
@@ -127,6 +128,13 @@ async fn run_acedrg(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    eprintln!(
+        "Bansu Server, v{} \n\nAuthors: {}\nLicense: {}\nCopyright (C) 2024, Global Phasing Ltd.",
+        env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_AUTHORS"),
+        env!("CARGO_PKG_LICENSE")
+    );
+
     simple_logger::SimpleLogger::new().env().init().unwrap();
 
     let addr = env::var("BANSU_ADDRESS").unwrap_or("127.0.0.1".to_string());
@@ -135,11 +143,20 @@ async fn main() -> std::io::Result<()> {
         .and_then(|port_str| port_str.parse::<u16>().ok())
         .unwrap_or(8080);
 
-    if let Ok(_val) = env::var("BANSU_DOCKER") {
-
+    if let Ok(docker_image_name) = env::var("BANSU_DOCKER") {
+        log::info!("Testing Docker configuration...");
+        if let Err(e) = docker::test_docker(&docker_image_name).await {
+            log::error!("Docker test failed - {:#}. Disabling Docker support.", e);
+            env::remove_var("BANSU_DOCKER");
+        } else {
+            log::info!("Starting with Docker support.");
+        }
+    } else {
+        log::info!("Starting without Docker support.");
     }
 
     let job_manager = JobManager::new().start();
+    log::info!("Initializing HTTP server...");
     HttpServer::new(move || {
         App::new()
             .app_data(Data::new(job_manager.clone()))
