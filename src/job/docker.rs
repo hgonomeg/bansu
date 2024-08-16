@@ -4,7 +4,7 @@ use bollard::{
         AttachContainerOptions, CreateContainerOptions, LogOutput, StartContainerOptions,
         WaitContainerOptions,
     },
-    secret::ContainerWaitResponse,
+    secret::{ContainerWaitResponse, HostConfig, Mount, MountTypeEnum},
     Docker,
 };
 use futures_util::StreamExt;
@@ -14,7 +14,7 @@ async fn test_docker_impl(
     image_name: &str,
     commands: Vec<&str>,
 ) -> anyhow::Result<ContainerHandleOutput> {
-    let container = ContainerHandle::new(&image_name, commands, "/").await?;
+    let container = ContainerHandle::new(&image_name, commands, "/", None).await?;
     let output = container.run().await?;
     if output.exit_info.status_code != 0 {
         anyhow::bail!(
@@ -75,6 +75,7 @@ impl ContainerHandle {
         image_name: &str,
         command: Vec<&str>,
         local_working_dir: &str,
+        mount_bind: Option<(&str, &str)>,
     ) -> anyhow::Result<Self> {
         log::debug!("Connecting to Docker...");
         let docker = tokio::task::spawn_blocking(|| Docker::connect_with_defaults())
@@ -90,6 +91,16 @@ impl ContainerHandle {
             working_dir: Some(local_working_dir),
             attach_stdout: Some(true),
             attach_stderr: Some(true),
+            host_config: mount_bind.map(|(src, dst)| HostConfig {
+                mounts: Some(vec![Mount {
+                    source: Some(src.to_string()),
+                    target: Some(dst.to_string()),
+                    typ: Some(MountTypeEnum::BIND),
+                    consistency: Some("default".to_string()),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         log::debug!("Creating container \"{}\"", &container_name);
