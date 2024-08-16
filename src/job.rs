@@ -5,6 +5,8 @@ use job_runner::JobRunner;
 use job_type::Job;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+pub mod docker;
+pub mod job_handle;
 pub mod job_runner;
 pub mod job_type;
 

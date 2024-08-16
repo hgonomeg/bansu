@@ -13,7 +13,6 @@ use job::{
     job_type::acedrg::AcedrgJob,
     JobManager, LookupJob, NewJob,
 };
-pub mod docker;
 pub mod messages;
 pub mod utils;
 pub mod ws_connection;
@@ -145,7 +144,7 @@ async fn main() -> std::io::Result<()> {
 
     if let Ok(docker_image_name) = env::var("BANSU_DOCKER") {
         log::info!("Testing Docker configuration...");
-        if let Err(e) = docker::test_docker(&docker_image_name).await {
+        if let Err(e) = job::docker::test_docker(&docker_image_name).await {
             log::error!("Docker test failed - {:#}. Disabling Docker support.", e);
             env::remove_var("BANSU_DOCKER");
         } else {
