@@ -20,11 +20,20 @@ impl Handler<JobData> for WsConnection {
     fn handle(&mut self, msg: JobData, ctx: &mut Self::Context) -> Self::Result {
         log::info!("Sending JobDataUpdate for job {}", self.job_id);
         ctx.text(serde_json::to_string(&WsJobDataUpdate::from(msg.clone())).unwrap());
-        if msg.status == JobStatus::Finished {
-            ctx.close(Some(CloseReason {
-                code: CloseCode::Normal,
-                description: None,
-            }));
+        match msg.status {
+            JobStatus::Finished => {
+                ctx.close(Some(CloseReason {
+                    code: CloseCode::Normal,
+                    description: None,
+                }));
+            }
+            JobStatus::Failed(_e) => {
+                ctx.close(Some(CloseReason {
+                    code: CloseCode::Error,
+                    description: None,
+                }));
+            }
+            _ => (),
         }
     }
 }
@@ -81,8 +90,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
         match msg {
             Ok(ws::Message::Ping(_msg)) => {
                 ctx.pong(&[]);
+                log::info!("{} - Replying with \"Pong\"", &self.job_id);
             }
             Ok(ws::Message::Text(_text)) => {
+                log::info!("{} - Ignoring incoming text message.", &self.job_id);
                 // let client_message = serde_json::from_str::<WsClientMessage>(&text);
                 // match client_message {
                 //     Ok(client_message) => match client_message.kind {
@@ -100,9 +111,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                 // }
             }
             Ok(ws::Message::Binary(_bin)) => {
+                log::info!("{} - Ignoring incoming binary message.", &self.job_id);
                 //ctx.binary(bin)
             }
-            _ => (),
+            _ => {
+                // log::info!("{} - Ignoring incoming message.", &self.job_id);
+            }
         }
     }
 }

@@ -1,6 +1,5 @@
+use crate::job::{JobFailureReason, JobOutput, JobStatus};
 use serde::{Deserialize, Serialize};
-
-use crate::job::{JobOutput, JobStatus};
 
 pub type JobId = String;
 
@@ -9,6 +8,23 @@ pub enum JobStatusInfo {
     Pending,
     Finished,
     Failed,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
+pub enum JobFailureInfo {
+    TimedOut,
+    AcedrgError,
+    IOError,
+}
+
+impl From<&JobFailureReason> for JobFailureInfo {
+    fn from(value: &JobFailureReason) -> Self {
+        match value {
+            JobFailureReason::TimedOut => JobFailureInfo::TimedOut,
+            JobFailureReason::IOError(_) => JobFailureInfo::IOError,
+            JobFailureReason::AcedrgError => JobFailureInfo::AcedrgError,
+        }
+    }
 }
 
 impl From<JobStatus> for JobStatusInfo {
@@ -25,11 +41,18 @@ impl From<JobStatus> for JobStatusInfo {
 pub struct WsJobDataUpdate {
     pub status: JobStatusInfo,
     pub job_output: Option<JobOutput>,
+    pub failure_reason: Option<JobFailureInfo>,
 }
 
 impl From<crate::job::JobData> for WsJobDataUpdate {
     fn from(value: crate::job::JobData) -> Self {
         Self {
+            failure_reason: {
+                match &value.status {
+                    JobStatus::Failed(f) => Some(JobFailureInfo::from(f)),
+                    _ => None,
+                }
+            },
             status: JobStatusInfo::from(value.status),
             job_output: value.job_output,
         }

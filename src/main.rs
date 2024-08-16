@@ -95,6 +95,7 @@ async fn job_ws(
         return Ok(HttpResponse::NotFound().finish());
     };
     let jm = job_manager.get_ref().clone();
+    // log::info!("/ws/{} - Establishing ws connection", &job_id);
     ws::start(WsConnection::new(jm, job, job_id), &req, stream)
 }
 
@@ -112,11 +113,11 @@ async fn run_acedrg(
             error_message: None,
         }),
         Err(e) => {
-            log::error!("/run_acedrg - {}", &e);
+            log::error!("/run_acedrg - Could not create job: {:#}", &e);
             // todo: different error types?
             HttpResponse::InternalServerError().json(JobSpawnReply {
                 job_id: None,
-                error_message: Some(e.to_string()),
+                error_message: Some(format!("{:#}", e)),
             })
         }
     }
