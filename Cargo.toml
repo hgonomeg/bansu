@@ -9,6 +9,7 @@ actix-rt = "2"
 actix-web = "4"
 actix-web-actors = "4"
 anyhow = "1"
+bollard = { version = "0.17", features = ["tokio-stream"] }
 # bytes = "1"
 futures-util = "0.3"
 log = "0.4"
