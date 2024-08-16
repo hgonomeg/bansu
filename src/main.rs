@@ -1,3 +1,5 @@
+use std::env;
+
 use actix::prelude::*;
 use actix_web::{
     get, /*http::StatusCode*/ post,
@@ -127,6 +129,12 @@ async fn run_acedrg(
 async fn main() -> std::io::Result<()> {
     simple_logger::SimpleLogger::new().env().init().unwrap();
 
+    let addr = env::var("BANSU_ADDRESS").unwrap_or("127.0.0.1".to_string());
+    let port: u16 = env::var("BANSU_PORT")
+        .ok()
+        .and_then(|port_str| port_str.parse::<u16>().ok())
+        .unwrap_or(8080);
+
     let job_manager = JobManager::new().start();
     HttpServer::new(move || {
         App::new()
@@ -135,7 +143,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_cif)
             .service(job_ws)
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind((addr, port))?
     .run()
     .await
 }
