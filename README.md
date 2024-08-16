@@ -22,6 +22,14 @@ where `T` is the timeout value associated with a given job type.
 
 The (current) default timeout for `Acedrg` is 2 minutes.
 
+### Configuration
+
+The following environment variables control the behavior of the server:
+
+* `TMPDIR` - can be used to specify location where jobs store temporary files
+* `BANSU_PORT` - sets the port to listen on
+* `BANSU_ADDRESS` - sets the address to listen on
+
 ### API
 
 The server exposes the following API:
