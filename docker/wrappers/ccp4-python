@@ -1,0 +1,5 @@
+#!/usr/bin/sh
+export CCP4=/usr
+export CBIN=/usr/bin/
+export CLIBD_MON=/usr/share/monomers/
+exec /usr/bin/python3 "$@"

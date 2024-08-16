@@ -1,31 +1,5 @@
 #!/usr/bin/sh
 
-
-initial_setup() {
-    mkdir -p /download
-    mkdir -p /build
-    dnf update -y
-    dnf install -y git rust cargo gcc gcc-c++ wget gzip \
-      python python-devel pybind11-devel python-pybind11 python-numpy python-setuptools python-pandas python-scipy meson \
-      boost boost-devel cmake \
-      make bison flex \
-      fftw2-devel fftw-devel \
-      helix vim fd-find ag
-    # The version shipped with Fedora is broken
-    pip install breezy
-
-    echo "#!/usr/bin/sh" > /usr/bin/ccp4-python
-    echo "export CCP4=/usr" >> /usr/bin/ccp4-python
-    echo "export CBIN=/usr/bin/" >> /usr/bin/ccp4-python
-    echo "export CLIBD_MON=/usr/share/monomers/" >> /usr/bin/ccp4-python
-    echo "exec /usr/bin/python3 \"\$@\"" >> /usr/bin/ccp4-python
-    chmod +x /usr/bin/ccp4-python
-
-    echo "#!/usr/bin/sh" > /usr/bin/servalcat
-    echo "exec /usr/bin/python3 -m servalcat \"\$@\"" >> /usr/bin/servalcat
-    chmod +x /usr/bin/servalcat
-}
-
 do_wget() {
   wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 "$@" || exit 7
 }
@@ -67,12 +41,6 @@ download_all() {
     # Servalcat
     do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz -O servalcat-${SERVALCAT_VER}.tar.gz &&\
     tar -xf servalcat-${SERVALCAT_VER}.tar.gz
-
-    echo Getting the monomer library...
-    cd /usr/share
-    git clone https://github.com/MonomerLibrary/monomers || exit 7
-
-
 }
 
 build_eigen() {
@@ -157,7 +125,6 @@ cleanup_all() {
 }
 
 setup_all() {
-  initial_setup
   download_all
   build_all
   cleanup_all
