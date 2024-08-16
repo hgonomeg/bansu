@@ -20,7 +20,13 @@ The ID of your job will be valid for the following amount of time:
 
 where `T` is the timeout value associated with a given job type.
 
+A temporary working directory is created for each job.
+All data is automatically deleted after job's ID becomes invalid.
+
 The (current) default timeout for `Acedrg` is 2 minutes.
+
+For security reasons, the server also supports running jobs
+in Docker containers.
 
 ### Configuration
 
@@ -29,6 +35,7 @@ The following environment variables control the behavior of the server:
 * `TMPDIR` - can be used to specify location where jobs store temporary files
 * `BANSU_PORT` - sets the port to listen on
 * `BANSU_ADDRESS` - sets the address to listen on
+* `BANSU_DOCKER` - if defined, enables Docker support
 
 ### API
 

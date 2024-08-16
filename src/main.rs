@@ -135,6 +135,10 @@ async fn main() -> std::io::Result<()> {
         .and_then(|port_str| port_str.parse::<u16>().ok())
         .unwrap_or(8080);
 
+    if let Ok(_val) = env::var("BANSU_DOCKER") {
+
+    }
+
     let job_manager = JobManager::new().start();
     HttpServer::new(move || {
         App::new()
