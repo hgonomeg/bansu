@@ -1,6 +1,10 @@
 use super::{Job, JobType};
-use crate::job::job_runner::OutputKind;
-use std::path::{Path, PathBuf};
+use crate::job::{job_handle::JobHandle, job_runner::OutputKind};
+use std::{
+    future::Future,
+    path::{Path, PathBuf},
+    pin::Pin,
+};
 
 pub struct ServalcatJob;
 
@@ -25,11 +29,11 @@ impl Job for ServalcatJob {
         todo!()
     }
 
-    fn launch(
-        &self,
-        _workdir_path: &std::path::Path,
-        _input_file_path: &std::path::Path,
-    ) -> std::io::Result<tokio::process::Child> {
+    fn launch<'a>(
+        &'a self,
+        _workdir_path: &'a std::path::Path,
+        _input_file_path: &'a std::path::Path,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<JobHandle>> + 'a>> {
         todo!()
     }
 

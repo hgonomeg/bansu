@@ -126,7 +126,7 @@ async fn run_acedrg(
 }
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> anyhow::Result<()> {
     eprintln!(
         "Bansu Server, v{} \n\nAuthors: {}\nLicense: {}\nCopyright (C) 2024, Global Phasing Ltd.",
         env!("CARGO_PKG_VERSION"),
@@ -144,7 +144,7 @@ async fn main() -> std::io::Result<()> {
 
     if let Ok(docker_image_name) = env::var("BANSU_DOCKER") {
         log::info!("Testing Docker configuration...");
-        if let Err(e) = job::docker::test_docker(&docker_image_name).await {
+        if let Err(e) = utils::test_docker(&docker_image_name).await {
             log::error!("Docker test failed - {:#}. Disabling Docker support.", e);
             env::remove_var("BANSU_DOCKER");
         } else {
@@ -154,9 +154,17 @@ async fn main() -> std::io::Result<()> {
         log::info!("Starting without Docker support.");
     }
 
+    if env::var("BANSU_DOCKER").is_err() {
+        log::info!("Testing environment configuration...");
+        if let Err(e) = utils::test_dockerless().await {
+            log::error!("Environment test failed: {} Refusing to continue without usable 'acedrg' and 'servalcat'.", &e);
+            return Err(e);
+        }
+    }
+
     let job_manager = JobManager::new().start();
     log::info!("Initializing HTTP server...");
-    HttpServer::new(move || {
+    Ok(HttpServer::new(move || {
         App::new()
             .app_data(Data::new(job_manager.clone()))
             .service(run_acedrg)
@@ -165,5 +173,5 @@ async fn main() -> std::io::Result<()> {
     })
     .bind((addr, port))?
     .run()
-    .await
+    .await?)
 }

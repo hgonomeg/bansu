@@ -1,9 +1,12 @@
 use std::{
     env::temp_dir,
     path::{Path, PathBuf},
+    process::Output,
 };
-use tokio::{fs, io::AsyncWriteExt};
+use tokio::{fs, io::AsyncWriteExt, process::Command};
 use uuid::Uuid;
+
+use crate::job::docker::{ContainerHandle, ContainerHandleOutput};
 
 pub struct WorkDir {
     pub path: PathBuf,
@@ -39,5 +42,81 @@ pub async fn dump_string_to_file<P: AsRef<Path>, S: AsRef<str>>(
         .open(filepath)
         .await?;
     file.write_all(content.as_ref().as_bytes()).await?;
+    Ok(())
+}
+
+async fn test_docker_impl(
+    image_name: &str,
+    commands: Vec<&str>,
+) -> anyhow::Result<ContainerHandleOutput> {
+    let container = ContainerHandle::new(&image_name, commands, "/", None).await?;
+    let output = container.run().await?;
+    if output.exit_info.status_code != 0 {
+        anyhow::bail!(
+            "The container returned with {} exit code. {}",
+            output.exit_info.status_code,
+            output
+                .exit_info
+                .error
+                .and_then(|e| e.message)
+                .unwrap_or_default()
+        );
+    }
+    Ok(output)
+}
+
+pub async fn test_docker(image_name: &str) -> anyhow::Result<()> {
+    let (acedrg_res, servalcat_res) = tokio::join!(
+        test_docker_impl(image_name, vec!["acedrg", "-v"]),
+        test_docker_impl(image_name, vec!["servalcat", "-v"])
+    );
+    let acedrg_output = acedrg_res?;
+    let servalcat_output = servalcat_res?;
+
+    log::info!(
+        "Output of 'acedrg -v' is {}\n{}",
+        String::from_utf8_lossy(&acedrg_output.output.stdout),
+        String::from_utf8_lossy(&acedrg_output.output.stderr)
+    );
+
+    log::info!(
+        "Output of 'servalcat -v' is {}\n{}",
+        String::from_utf8_lossy(&servalcat_output.output.stderr),
+        String::from_utf8_lossy(&servalcat_output.output.stdout)
+    );
+    Ok(())
+}
+
+async fn test_dockerless_impl(program: &str, args: &[&str]) -> std::io::Result<Output> {
+    Command::new(program).args(args).output().await
+}
+
+pub async fn test_dockerless() -> anyhow::Result<()> {
+    let (acedrg_res, servalcat_res) = tokio::join!(
+        test_dockerless_impl("acedrg", &["-v"]),
+        test_dockerless_impl("servalcat", &["-v"])
+    );
+    let acedrg_output = acedrg_res?;
+    let servalcat_output = servalcat_res?;
+
+    log::info!(
+        "Output of 'acedrg -v' is {}\n{}",
+        String::from_utf8_lossy(&acedrg_output.stdout),
+        String::from_utf8_lossy(&acedrg_output.stderr)
+    );
+
+    if !acedrg_output.status.success() {
+        anyhow::bail!("acedrg exited with an error");
+    }
+
+    log::info!(
+        "Output of 'servalcat -v' is {}\n{}",
+        String::from_utf8_lossy(&servalcat_output.stderr),
+        String::from_utf8_lossy(&servalcat_output.stdout)
+    );
+
+    if !servalcat_output.status.success() {
+        anyhow::bail!("servalcat exited with an error");
+    }
     Ok(())
 }

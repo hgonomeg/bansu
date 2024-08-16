@@ -4,9 +4,8 @@ use std::{
     pin::Pin,
     time::Duration,
 };
-use tokio::process::Child;
 
-use super::job_runner::OutputKind;
+use super::{job_handle::JobHandle, job_runner::OutputKind};
 
 pub mod acedrg;
 pub mod servalcat;
@@ -15,10 +14,15 @@ pub trait Job: Send {
     fn name(&self) -> &'static str;
     fn job_type(&self) -> JobType;
     fn timeout_value(&self) -> Duration;
+    /// Constructs the given type of output filename
     fn output_filename(&self, workdir_path: &Path, kind: OutputKind) -> Option<PathBuf>;
     fn executable_name(&self) -> &'static str;
     // This might need a redesign so that it combines writing input with launching
-    fn launch(&self, workdir_path: &Path, input_file_path: &Path) -> std::io::Result<Child>;
+    fn launch<'a>(
+        &'a self,
+        workdir_path: &'a Path,
+        input_file_path: &'a Path,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<JobHandle>> + 'a>>;
     /// Returns path to the input file
     fn write_input<'a>(
         &'a self,

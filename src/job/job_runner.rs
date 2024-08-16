@@ -160,10 +160,11 @@ impl JobRunner {
             .write_input(&workdir.path)
             .await
             .with_context(|| "Could not write input for job")?;
-        log::info!("{} - Lauching child process.", &id);
-        let child = job_object
+        log::info!("{} - Starting job", &id);
+        let jhandle = job_object
             .launch(&workdir.path, &input_path)
-            .with_context(|| "Could not launch child process")?;
+            .await
+            .with_context(|| "Could not start job")?;
         let timeout_val = job_object.timeout_value();
 
         let ret = Self {
@@ -178,8 +179,7 @@ impl JobRunner {
         };
 
         Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {
-            let worker =
-                JobRunner::worker(JobHandle::Direct(child), ctx.address(), id, timeout_val);
+            let worker = JobRunner::worker(jhandle, ctx.address(), id, timeout_val);
             let fut = actix::fut::wrap_future(worker);
             ctx.spawn(fut);
             ret

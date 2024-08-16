@@ -10,47 +10,6 @@ use bollard::{
 use futures_util::StreamExt;
 use uuid::Uuid;
 
-async fn test_docker_impl(
-    image_name: &str,
-    commands: Vec<&str>,
-) -> anyhow::Result<ContainerHandleOutput> {
-    let container = ContainerHandle::new(&image_name, commands, "/", None).await?;
-    let output = container.run().await?;
-    if output.exit_info.status_code != 0 {
-        anyhow::bail!(
-            "The container returned with {} exit code. {}",
-            output.exit_info.status_code,
-            output
-                .exit_info
-                .error
-                .and_then(|e| e.message)
-                .unwrap_or_default()
-        );
-    }
-    Ok(output)
-}
-
-pub async fn test_docker(image_name: &str) -> anyhow::Result<()> {
-    let (acedrg_res, servalcat_res) = tokio::join!(
-        test_docker_impl(image_name, vec!["acedrg", "-v"]),
-        test_docker_impl(image_name, vec!["servalcat", "-v"])
-    );
-    let acedrg_output = acedrg_res?;
-    let servalcat_output = servalcat_res?;
-
-    log::info!(
-        "Output of 'acedrg -v' is {}\n{}",
-        String::from_utf8_lossy(&acedrg_output.output.stdout),
-        String::from_utf8_lossy(&acedrg_output.output.stderr)
-    );
-
-    log::info!(
-        "Output of 'servalcat -v' is {}\n{}",
-        String::from_utf8_lossy(&servalcat_output.output.stderr),
-        String::from_utf8_lossy(&servalcat_output.output.stdout)
-    );
-    Ok(())
-}
 #[derive(Debug)]
 pub struct ContainerHandle {
     docker: Docker,
@@ -173,11 +132,11 @@ impl ContainerHandle {
         self.docker
             .start_container(&self.id, None::<StartContainerOptions<String>>)
             .await
-            .with_context(|| "Could not start Docker container.")?;
+            .with_context(|| "Could not start Docker container")?;
 
         let mut exit_info = None;
         while let Some(res) = wait_stream.next().await {
-            exit_info = Some(res.with_context(|| "Error waiting for container.")?);
+            exit_info = Some(res.with_context(|| "Error waiting for container")?);
         }
 
         let log_worker_output = log_worker

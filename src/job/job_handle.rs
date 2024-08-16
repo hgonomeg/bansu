@@ -1,16 +1,47 @@
 use super::docker::ContainerHandle;
 use std::{
     os::unix::process::ExitStatusExt,
-    process::{ExitStatus, Output},
+    process::{ExitStatus, Output, Stdio},
 };
-use tokio::process::Child;
+use tokio::process::{Child, Command};
 
+#[derive(Debug)]
+pub struct JobProcessConfiguration<'a> {
+    pub executable: &'a str,
+    pub args: Vec<&'a str>,
+    pub working_dir: &'a str,
+}
+
+#[derive(Debug)]
 pub enum JobHandle {
     Direct(Child),
     Docker(ContainerHandle),
 }
 
 impl JobHandle {
+    pub async fn new<'a>(cfg: JobProcessConfiguration<'a>) -> anyhow::Result<Self> {
+        if let Ok(image) = std::env::var("BANSU_DOCKER") {
+            log::info!("Spawning new container for job");
+            let handle = ContainerHandle::new(
+                &image,
+                [&[cfg.executable], cfg.args.as_slice()].concat(),
+                cfg.working_dir,
+                Some((cfg.working_dir, cfg.working_dir)),
+            )
+            .await?;
+            Ok(Self::Docker(handle))
+        } else {
+            log::info!("Spawning child process for job");
+            let child = Command::new(cfg.executable)
+                .current_dir(cfg.working_dir)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .args(cfg.args)
+                .spawn()?;
+            Ok(Self::Direct(child))
+        }
+    }
     /// This API is currently experimental
     pub async fn join(self) -> anyhow::Result<Output> {
         match self {
