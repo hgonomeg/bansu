@@ -21,7 +21,7 @@ impl Job for AcedrgJob {
     }
 
     fn timeout_value(&self) -> Duration {
-        Duration::from_secs(4 * 60)
+        Duration::from_secs(2 * 60)
     }
 
     fn output_filename(&self, workdir_path: &Path, kind: OutputKind) -> Option<PathBuf> {
