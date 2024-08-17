@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::Context;
 use bollard::{
     container::{
@@ -184,27 +182,26 @@ impl Drop for ContainerHandle {
         let id = std::mem::take(&mut self.id);
         let d = self.docker.clone();
         actix_rt::spawn(async move {
-            let mut retries: u8 = 0;
-            loop {
-                if retries == 0 {
-                    log::info!("Removing container {}", &id);
-                } else {
-                    log::info!("Re-trying to remove container {}", &id);
-                }
-                if let Err(e) = d.remove_container(&id, None).await {
-                    retries += 1;
-                    if retries > 30 {
-                        log::error!(
-                            "Giving up further attempts to remove container {} after 30 attempts: {}",
-                            &id, &e
-                        );
-                        break;
-                    }
-                    log::warn!("Could not remove container: {}. Another attempt will be made in {} seconds.", e, retries * 5);
-                } else {
-                    break;
-                }
-                tokio::time::sleep(Duration::from_secs(5 * retries as u64)).await;
+            log::info!("Removing container {}", &id);
+            if let Err(e) = d.remove_container(&id, None).await {
+                log::warn!(
+                    "Could not remove container {}: {}. Attempting to stop it...",
+                    &id,
+                    e
+                );
+            } else {
+                return;
+            }
+            actix_rt::task::yield_now().await;
+            if let Err(e) = d.stop_container(&id, None).await {
+                log::warn!("Could not stop container {}: {}.", &id, e);
+            }
+            if let Err(e) = d.remove_container(&id, None).await {
+                log::error!(
+                    "Could not remove container {}: {}. No further attempts will be made.",
+                    &id,
+                    e
+                );
             }
         });
     }
