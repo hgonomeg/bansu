@@ -37,7 +37,7 @@ impl ContainerHandle {
         mount_bind: Option<(&str, &str)>,
     ) -> anyhow::Result<Self> {
         log::debug!("Connecting to Docker...");
-        let mut begin_time = tokio::time::Instant::now();
+        let begin_time = tokio::time::Instant::now();
         let docker = tokio::task::spawn_blocking(|| Docker::connect_with_defaults())
             .await
             .unwrap()
@@ -77,16 +77,16 @@ impl ContainerHandle {
             name: container_name.clone(),
             platform: None::<String>,
         };
-        begin_time = tokio::time::Instant::now();
+        // begin_time = tokio::time::Instant::now();
         let container = docker
             .create_container(Some(opts), config)
             .await
             .with_context(|| "Could not create Docker container")?;
-        let creation_time = tokio::time::Instant::now();
-        log::debug!(
-            "Took {} ms to create Docker container",
-            (creation_time - begin_time).as_millis()
-        );
+        // let creation_time = tokio::time::Instant::now();
+        // log::debug!(
+        //     "Took {} ms to create Docker container",
+        //     (creation_time - begin_time).as_millis()
+        // );
         log::info!(
             "Created Docker container with id={} name={}",
             &container.id,
