@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Context;
 use bollard::{
     container::{
@@ -51,7 +53,7 @@ impl ContainerHandle {
             attach_stdout: Some(true),
             attach_stderr: Some(true),
             // We are probably gonna run as root anyway.
-            // Running as non-root currently causes permission issues 
+            // Running as non-root currently causes permission issues
             // while deleting temporary files
             // user: Some("bansu"),
             host_config: mount_bind.map(|(src, dst)| HostConfig {
@@ -182,9 +184,27 @@ impl Drop for ContainerHandle {
         let id = std::mem::take(&mut self.id);
         let d = self.docker.clone();
         actix_rt::spawn(async move {
-            log::info!("Removing container {}", &id);
-            if let Err(e) = d.remove_container(&id, None).await {
-                log::error!("Could not remove container: {}", e);
+            let mut retries: u8 = 0;
+            loop {
+                if retries == 0 {
+                    log::info!("Removing container {}", &id);
+                } else {
+                    log::info!("Re-trying to remove container {}", &id);
+                }
+                if let Err(e) = d.remove_container(&id, None).await {
+                    retries += 1;
+                    if retries > 30 {
+                        log::error!(
+                            "Giving up further attempts to remove container {} after 30 attempts: {}",
+                            &id, &e
+                        );
+                        break;
+                    }
+                    log::warn!("Could not remove container: {}. Another attempt will be made in {} seconds.", e, retries * 5);
+                } else {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_secs(5 * retries as u64)).await;
             }
         });
     }
