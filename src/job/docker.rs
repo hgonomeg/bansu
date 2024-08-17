@@ -44,12 +44,14 @@ impl ContainerHandle {
 
         let u = Uuid::new_v4();
         let container_name = format!("bansu-worker-{}", u.to_string());
+        let username = whoami::username();
         let config = bollard::container::Config {
             cmd: Some(command),
             image: Some(image_name),
             working_dir: Some(local_working_dir),
             attach_stdout: Some(true),
             attach_stderr: Some(true),
+            user: Some(&username),
             host_config: mount_bind.map(|(src, dst)| HostConfig {
                 mounts: Some(vec![Mount {
                     source: Some(src.to_string()),
