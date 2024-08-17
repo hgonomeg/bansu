@@ -44,14 +44,16 @@ impl ContainerHandle {
 
         let u = Uuid::new_v4();
         let container_name = format!("bansu-worker-{}", u.to_string());
-        let username = whoami::username();
         let config = bollard::container::Config {
             cmd: Some(command),
             image: Some(image_name),
             working_dir: Some(local_working_dir),
             attach_stdout: Some(true),
             attach_stderr: Some(true),
-            user: Some(&username),
+            // We are probably gonna run as root anyway.
+            // Running as non-root currently causes permission issues 
+            // while deleting temporary files
+            // user: Some("bansu"),
             host_config: mount_bind.map(|(src, dst)| HostConfig {
                 mounts: Some(vec![Mount {
                     source: Some(src.to_string()),
