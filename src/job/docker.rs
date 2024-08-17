@@ -37,11 +37,17 @@ impl ContainerHandle {
         mount_bind: Option<(&str, &str)>,
     ) -> anyhow::Result<Self> {
         log::debug!("Connecting to Docker...");
+        let mut begin_time = tokio::time::Instant::now();
         let docker = tokio::task::spawn_blocking(|| Docker::connect_with_defaults())
             .await
             .unwrap()
             .with_context(|| "Could not connect to Docker")?;
 
+        let conn_time = tokio::time::Instant::now();
+        log::debug!(
+            "Took {} ms to connect to Docker",
+            (conn_time - begin_time).as_millis()
+        );
         let u = Uuid::new_v4();
         let container_name = format!("bansu-worker-{}", u.to_string());
         let config = bollard::container::Config {
@@ -71,11 +77,16 @@ impl ContainerHandle {
             name: container_name.clone(),
             platform: None::<String>,
         };
+        begin_time = tokio::time::Instant::now();
         let container = docker
             .create_container(Some(opts), config)
             .await
             .with_context(|| "Could not create Docker container")?;
-
+        let creation_time = tokio::time::Instant::now();
+        log::debug!(
+            "Took {} ms to create Docker container",
+            (creation_time - begin_time).as_millis()
+        );
         log::info!(
             "Created Docker container with id={} name={}",
             &container.id,
@@ -90,6 +101,8 @@ impl ContainerHandle {
     }
 
     pub async fn run(&self) -> anyhow::Result<ContainerHandleOutput> {
+        let begin_time = tokio::time::Instant::now();
+
         let mut wait_stream = self.docker.wait_container(
             &self.id,
             Some(WaitContainerOptions {
@@ -137,6 +150,12 @@ impl ContainerHandle {
             .start_container(&self.id, None::<StartContainerOptions<String>>)
             .await
             .with_context(|| "Could not start Docker container")?;
+
+        let end_time = tokio::time::Instant::now();
+        log::debug!(
+            "Took {} ms to start Docker container",
+            (begin_time - end_time).as_millis()
+        );
 
         let mut exit_info = None;
         while let Some(res) = wait_stream.next().await {

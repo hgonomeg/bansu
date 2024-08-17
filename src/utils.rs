@@ -1,7 +1,9 @@
 use std::{
     env::temp_dir,
+    future::Future,
     path::{Path, PathBuf},
     process::Output,
+    time::Duration,
 };
 use tokio::{fs, io::AsyncWriteExt, process::Command};
 use uuid::Uuid;
@@ -119,4 +121,24 @@ pub async fn test_dockerless() -> anyhow::Result<()> {
         anyhow::bail!("servalcat exited with an error");
     }
     Ok(())
+}
+
+pub fn measure_time<F, R>(f: F) -> (R, Duration)
+where
+    F: FnOnce() -> R,
+{
+    let begin = tokio::time::Instant::now();
+    let r = f();
+    let end = tokio::time::Instant::now();
+    (r, end - begin)
+}
+
+pub async fn measure_time_async<Fut, R>(f: Fut) -> (R, Duration)
+where
+    Fut: Future<Output = R>,
+{
+    let begin = tokio::time::Instant::now();
+    let r = f.await;
+    let end = tokio::time::Instant::now();
+    (r, end - begin)
 }

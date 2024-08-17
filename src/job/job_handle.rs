@@ -1,4 +1,5 @@
 use super::docker::ContainerHandle;
+use crate::utils::measure_time_async;
 use std::{
     os::unix::process::ExitStatusExt,
     process::{ExitStatus, Output, Stdio},
@@ -22,23 +23,33 @@ impl JobHandle {
     pub async fn new<'a>(cfg: JobProcessConfiguration<'a>) -> anyhow::Result<Self> {
         if let Ok(image) = std::env::var("BANSU_DOCKER") {
             log::info!("Spawning new container for job");
-            let handle = ContainerHandle::new(
-                &image,
-                [&[cfg.executable], cfg.args.as_slice()].concat(),
-                cfg.working_dir,
-                Some((cfg.working_dir, cfg.working_dir)),
-            )
-            .await?;
+            let (res, time) = measure_time_async(async move {
+                ContainerHandle::new(
+                    &image,
+                    [&[cfg.executable], cfg.args.as_slice()].concat(),
+                    cfg.working_dir,
+                    Some((cfg.working_dir, cfg.working_dir)),
+                )
+                .await
+            })
+            .await;
+            let handle = res?;
+            log::debug!("Took {} ms to spawn job container", time.as_millis());
             Ok(Self::Docker(handle))
         } else {
             log::info!("Spawning child process for job");
-            let child = Command::new(cfg.executable)
-                .current_dir(cfg.working_dir)
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .args(cfg.args)
-                .spawn()?;
+            let (child_res, time) = measure_time_async(async move {
+                Command::new(cfg.executable)
+                    .current_dir(cfg.working_dir)
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .args(cfg.args)
+                    .spawn()
+            })
+            .await;
+            let child = child_res?;
+            log::debug!("Took {} ms to spawn child process", time.as_millis());
             Ok(Self::Direct(child))
         }
     }
