@@ -93,6 +93,7 @@ impl Handler<WorkerResult> for JobRunner {
             }
             Ok(Ok(output)) => {
                 self.data.status = if output.status.success() {
+                    log::info!("{} - Job finished.", self.id);
                     JobStatus::Finished
                 } else {
                     log::warn!("{} - Job failed.", self.id);
@@ -104,7 +105,7 @@ impl Handler<WorkerResult> for JobRunner {
                 });
             }
         }
-        log::info!("{} - Status updated: {:?}", self.id, &self.data.status);
+        log::debug!("{} - Status updated: {:?}", self.id, &self.data.status);
         for i in &self.websocket_addrs {
             i.do_send(self.data.clone());
         }
