@@ -83,16 +83,19 @@ impl Handler<WorkerResult> for JobRunner {
         //log::debug!("JobRunner got result {:?}", &msg.0);
         match msg.0 {
             Err(_elapsed) => {
+                log::error!("{} - Job timed out.", self.id);
                 self.data.status = JobStatus::Failed(JobFailureReason::TimedOut);
             }
             Ok(Err(e)) => {
-                self.data.status =
-                    JobStatus::Failed(JobFailureReason::SetupError(format!("{:#}", e)));
+                let msg = format!("{:#}", e);
+                log::error!("{} - Job handling error: {}", self.id, &msg);
+                self.data.status = JobStatus::Failed(JobFailureReason::SetupError(msg));
             }
             Ok(Ok(output)) => {
                 self.data.status = if output.status.success() {
                     JobStatus::Finished
                 } else {
+                    log::warn!("{} - Job failed.", self.id);
                     JobStatus::Failed(JobFailureReason::JobProcessError)
                 };
                 self.data.job_output = Some(JobOutput {
