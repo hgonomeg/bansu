@@ -3,6 +3,7 @@ use crate::job::job_handle::{JobHandle, JobProcessConfiguration};
 use crate::job::job_runner::OutputKind;
 use crate::{utils::dump_string_to_file, AcedrgArgs};
 use futures_util::Future;
+use std::env;
 use std::{
     path::{Path, PathBuf},
     pin::Pin,
@@ -21,7 +22,14 @@ impl Job for AcedrgJob {
     }
 
     fn timeout_value(&self) -> Duration {
-        Duration::from_secs(2 * 60)
+        if let Some(Ok(tm)) = env::var("BANSU_ACEDRG_TIMEOUT")
+            .ok()
+            .map(|tm| tm.parse::<u64>())
+        {
+            Duration::from_secs(tm)
+        } else {
+            Duration::from_secs(2 * 60)
+        }
     }
 
     fn output_filename(&self, workdir_path: &Path, kind: OutputKind) -> Option<PathBuf> {

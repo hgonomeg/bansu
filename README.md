@@ -37,6 +37,7 @@ The following environment variables control the behavior of the server:
 * `BANSU_PORT` - sets the port to listen on
 * `BANSU_ADDRESS` - sets the address to listen on
 * `BANSU_DOCKER` - enables Docker support and sets the name of the Docker image used for running jobs.
+* `BANSU_ACEDRG_TIMEOUT` - specifies timeout for Acedrg (in seconds)
 
 ### API
 
