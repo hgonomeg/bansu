@@ -49,10 +49,10 @@ impl JobHandle {
             JobHandle::Docker(handle) => {
                 let output = handle.run().await?;
                 // The wait API is either terrible or has a serious bug
-                // This check below would cause misinterpration of 
-                // the failure of processes running in Docker 
+                // This check below would cause misinterpration of
+                // the failure of processes running in Docker
                 // as failure or the waiting procedure itself
-                
+
                 // if let Some(err) = output.exit_info.error.and_then(|e| e.message) {
                 //     anyhow::bail!("Error waiting for container: {}", err);
                 // }
