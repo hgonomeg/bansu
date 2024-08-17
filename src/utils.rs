@@ -74,13 +74,13 @@ pub async fn test_docker(image_name: &str) -> anyhow::Result<()> {
     let servalcat_output = servalcat_res?;
 
     log::info!(
-        "Output of 'acedrg -v' is {}\n{}",
+        "Output of 'acedrg -v' is \n{}\n{}",
         String::from_utf8_lossy(&acedrg_output.output.stdout),
         String::from_utf8_lossy(&acedrg_output.output.stderr)
     );
 
     log::info!(
-        "Output of 'servalcat -v' is {}\n{}",
+        "Output of 'servalcat -v' is \n{}\n{}",
         String::from_utf8_lossy(&servalcat_output.output.stderr),
         String::from_utf8_lossy(&servalcat_output.output.stdout)
     );
@@ -100,7 +100,7 @@ pub async fn test_dockerless() -> anyhow::Result<()> {
     let servalcat_output = servalcat_res?;
 
     log::info!(
-        "Output of 'acedrg -v' is {}\n{}",
+        "Output of 'acedrg -v' is \n{}\n{}",
         String::from_utf8_lossy(&acedrg_output.stdout),
         String::from_utf8_lossy(&acedrg_output.stderr)
     );
@@ -110,7 +110,7 @@ pub async fn test_dockerless() -> anyhow::Result<()> {
     }
 
     log::info!(
-        "Output of 'servalcat -v' is {}\n{}",
+        "Output of 'servalcat -v' is \n{}\n{}",
         String::from_utf8_lossy(&servalcat_output.stderr),
         String::from_utf8_lossy(&servalcat_output.stdout)
     );
