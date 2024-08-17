@@ -48,9 +48,14 @@ impl JobHandle {
             JobHandle::Direct(child) => Ok(child.wait_with_output().await?),
             JobHandle::Docker(handle) => {
                 let output = handle.run().await?;
-                if let Some(err) = output.exit_info.error.and_then(|e| e.message) {
-                    anyhow::bail!("Error waiting for container: {}", err);
-                }
+                // The wait API is either terrible or has a serious bug
+                // This check below would cause misinterpration of 
+                // the failure of processes running in Docker 
+                // as failure or the waiting procedure itself
+                
+                // if let Some(err) = output.exit_info.error.and_then(|e| e.message) {
+                //     anyhow::bail!("Error waiting for container: {}", err);
+                // }
                 Ok(Output {
                     status: ExitStatus::from_raw(output.exit_info.status_code as i32),
                     stdout: output.output.stdout,

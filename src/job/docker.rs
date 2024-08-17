@@ -4,7 +4,7 @@ use bollard::{
         AttachContainerOptions, CreateContainerOptions, LogOutput, StartContainerOptions,
         WaitContainerOptions,
     },
-    secret::{ContainerWaitResponse, HostConfig, Mount, MountTypeEnum},
+    secret::{ContainerWaitExitError, ContainerWaitResponse, HostConfig, Mount, MountTypeEnum},
     Docker,
 };
 use futures_util::StreamExt;
@@ -136,7 +136,27 @@ impl ContainerHandle {
 
         let mut exit_info = None;
         while let Some(res) = wait_stream.next().await {
-            exit_info = Some(res.with_context(|| "Error waiting for container")?);
+            // the wait API is terrible
+            // or has a bug
+            match res {
+                Ok(ei) => {
+                    exit_info = Some(ei);
+                }
+                // This uglyness prevents misinterpreting the failure of processes
+                // running in Docker as failure or the waiting procedure itself
+                Err(bollard::errors::Error::DockerContainerWaitError { error, code }) => {
+                    // log::warn!("Error {:#?}", e);
+                    exit_info = Some(ContainerWaitResponse {
+                        status_code: code,
+                        error: Some(ContainerWaitExitError {
+                            message: Some(error),
+                        }),
+                    });
+                }
+                Err(e) => {
+                    anyhow::bail!("Error while waiting for container: {:#?}", e);
+                }
+            }
         }
 
         let log_worker_output = log_worker
