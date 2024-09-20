@@ -45,4 +45,8 @@ impl Job for ServalcatJob {
     > {
         todo!()
     }
+
+    fn validate_input(&self) -> anyhow::Result<()> {
+        todo!()
+    }
 }

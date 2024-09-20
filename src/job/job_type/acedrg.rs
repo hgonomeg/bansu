@@ -47,12 +47,56 @@ impl Job for AcedrgJob {
         "acedrg"
     }
 
+    fn validate_input(&self) -> anyhow::Result<()> {
+        // to consider: --bsu, --bsl, --asu, --asl, --res (alias to -r), --numInitConf, --multiconf, --numOptmStep
+        let allowed_args: [&str; 25] = [
+            "-a", "--rechi",
+            "-r",
+            "-e", "--molgen",
+            "-n", "--typeOut",
+            "-p", "--coords",
+            "-q", "--mdiff",
+            "--neu",
+            "--keku",
+            "--nucl",
+            "-u", "--hmo",
+            "-z", "--noGeoOpt",
+            "-K", "--noProt",
+            "-M", "--modifiedPlanes",
+            "-k", "-j", "-l"
+        ];
+        let mut r_arg = false;
+        let mut numeric_arg = false;
+        for arg in self.args.commandline_args.iter() {
+            if !(r_arg || numeric_arg) && !allowed_args.iter().any(|z| z == arg) {
+                anyhow::bail!("Input validation failed! Invalid commandline arguments. Supported arguments are: {:?}", &allowed_args);
+            }
+            if r_arg && !arg.chars().all(|chr| chr.is_alphabetic()) {
+                anyhow::bail!("Input validation failed! Non-alphabetic characters used in monomer name (argument of the flag '-r')");
+            }
+            if numeric_arg && !arg.chars().all(|chr| chr.is_numeric()) {
+                anyhow::bail!("Input validation failed! Non-numeric characters used for '-k' or '-j' or '-l'");
+            }
+            if arg == "-k" || arg == "-j" || arg == "-l" {
+                numeric_arg = true;
+            } else {
+                numeric_arg = false;
+            }
+            if arg == "-r" {
+                r_arg = true;
+            } else {
+                r_arg = false;
+            }
+        }
+        Ok(())
+    }
+
     fn launch<'a>(
         &'a self,
         workdir_path: &'a Path,
         input_file_path: &'a Path,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<JobHandle>> + 'a>> {
-        // TODO: SANITIZE INPUT!
+        // Makes `commandline_args` moveable into the async block without copying
         let commandline_args = self.args.commandline_args.iter().map(|z| z.as_str());
         Box::pin(async move {
             let mut args = vec![

@@ -157,6 +157,7 @@ impl JobRunner {
         job_object: Box<dyn Job>,
     ) -> anyhow::Result<Addr<JobRunner>> {
         log::info!("Creating new {} job - {}", job_object.name(), &id);
+        job_object.validate_input()?;
         let workdir = mkworkdir()
             .await
             .with_context(|| "Could not create working directory")?;

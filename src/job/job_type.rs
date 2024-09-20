@@ -28,8 +28,8 @@ pub trait Job: Send {
         &'a self,
         workdir_path: &'a Path,
     ) -> Pin<Box<dyn Future<Output = std::io::Result<PathBuf>> + 'a>>;
-
-    // todo: input validation
+    /// Validate input (used to chec the provided commandline args for safety)
+    fn validate_input(&self) -> anyhow::Result<()>;
 }
 
 pub enum JobType {
