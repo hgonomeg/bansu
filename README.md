@@ -132,7 +132,7 @@ Combined together gives us:
 ## Todo
 
 * Documentation
- * Node test
- * Building Docker container
+  * Node test
+  * Building Docker container
 * Support for servalcat
 * Think about API design for defining graph-like pipelines (if we ever need that)
