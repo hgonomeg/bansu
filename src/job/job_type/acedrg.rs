@@ -50,20 +50,31 @@ impl Job for AcedrgJob {
     fn validate_input(&self) -> anyhow::Result<()> {
         // to consider: --bsu, --bsl, --asu, --asl, --res (alias to -r), --numInitConf, --multiconf, --numOptmStep
         let allowed_args: [&str; 25] = [
-            "-a", "--rechi",
+            "-a",
+            "--rechi",
             "-r",
-            "-e", "--molgen",
-            "-n", "--typeOut",
-            "-p", "--coords",
-            "-q", "--mdiff",
+            "-e",
+            "--molgen",
+            "-n",
+            "--typeOut",
+            "-p",
+            "--coords",
+            "-q",
+            "--mdiff",
             "--neu",
             "--keku",
             "--nucl",
-            "-u", "--hmo",
-            "-z", "--noGeoOpt",
-            "-K", "--noProt",
-            "-M", "--modifiedPlanes",
-            "-k", "-j", "-l"
+            "-u",
+            "--hmo",
+            "-z",
+            "--noGeoOpt",
+            "-K",
+            "--noProt",
+            "-M",
+            "--modifiedPlanes",
+            "-k",
+            "-j",
+            "-l",
         ];
         let mut r_arg = false;
         let mut numeric_arg = false;
@@ -75,7 +86,9 @@ impl Job for AcedrgJob {
                 anyhow::bail!("Input validation failed! Non-alphabetic characters used in monomer name (argument of the flag '-r')");
             }
             if numeric_arg && !arg.chars().all(|chr| chr.is_numeric()) {
-                anyhow::bail!("Input validation failed! Non-numeric characters used for '-k' or '-j' or '-l'");
+                anyhow::bail!(
+                    "Input validation failed! Non-numeric characters used for '-k' or '-j' or '-l'"
+                );
             }
             if arg == "-k" || arg == "-j" || arg == "-l" {
                 numeric_arg = true;
