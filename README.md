@@ -45,11 +45,11 @@ This greatly reduces the potential impact of a successful exploitation of any vu
 The following environment variables control the behavior of the server:
 
 * `TMPDIR` - can be used to specify location where jobs store temporary files
-* `RUST_LOG` - sets the log level
-* `BANSU_PORT` - sets the port to listen on
-* `BANSU_ADDRESS` - sets the address to listen on
+* `RUST_LOG` - sets the log level (like with most Rust programs)
+* `BANSU_PORT` - sets the port to listen on (`8080` by default)
+* `BANSU_ADDRESS` - sets the address to listen on (`127.0.0.1` by default)
 * `BANSU_DOCKER` - enables Docker support and sets the name of the Docker image used for running jobs. If this variable is set, the server will refuse to run if the Docker configuration is invalid
-* `BANSU_ACEDRG_TIMEOUT` - specifies timeout for Acedrg (in seconds)
+* `BANSU_ACEDRG_TIMEOUT` - specifies timeout for Acedrg (in seconds) (`120` by default)
 
 ### API
 
@@ -122,6 +122,41 @@ Returns:
 * `500 Internal Server Error` if the output file could not be read
 * `400 Bad Request` if the given `job_id` does is not an `Acedrg` job or if the job is still pending
 
+## Setup
+
+### Build and run
+
+In order to build Bansu, all you need is a Rust compiler.
+Just use:
+
+`$ cargo build -r`
+
+No special compile-time dependencies are needed.
+
+There is one optional runtime dependency: Docker.
+
+The server manages docker containers (as described above in the security section).
+It needs to have adequate permissions in order to do that.
+The server uses the `bollard` crate to setup Docker connection using platform-dependent defaults (Unix pipe, Windows socket, fallback: HTTP).
+Refer to [bollard documentation for more details](https://docs.rs/bollard/0.17.1/bollard/struct.Docker.html#method.connect_with_defaults).
+
+If you do not want to make use of Docker support, make sure that `acedrg` and `servalcat` are available in the system path.
+
+### Docker container setup
+
+A `Dockerfile` is included to build a suitable Docker container image.
+
+In order to build it:
+
+1. Go to `docker/`
+2. Run `docker build --pull --network host -t <name_of_your_image> -f FedoraDockerfile .`
+3. Wait for the image to be built.
+
+The image is based on Fedora but can be used on any distribution.
+
+### Testing
+
+In order to test Bansu, you can make use of the provided Node.JS script
 
 ## Name
 
@@ -145,8 +180,6 @@ Combined together gives us:
 
 ## Todo
 
-* Documentation
-  * Node test
-  * Building Docker container
+* Add max concurrent job limit
 * Support for servalcat
 * Think about API design for defining graph-like pipelines (if we ever need that)
