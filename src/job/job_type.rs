@@ -4,11 +4,20 @@ use std::{
     pin::Pin,
     time::Duration,
 };
+use thiserror::Error;
 
 use super::{job_handle::JobHandle, job_runner::OutputKind};
 
 pub mod acedrg;
 pub mod servalcat;
+
+#[derive(Error, Debug)]
+pub enum JobSpawnError {
+    #[error("Input validation failed: {0}")]
+    InputValidation(String),
+    #[error("{0:#}")]
+    Other(#[from] anyhow::Error),
+}
 
 pub trait Job: Send {
     fn name(&self) -> &'static str;
@@ -29,7 +38,7 @@ pub trait Job: Send {
         workdir_path: &'a Path,
     ) -> Pin<Box<dyn Future<Output = std::io::Result<PathBuf>> + 'a>>;
     /// Validate input (used to chec the provided commandline args for safety)
-    fn validate_input(&self) -> anyhow::Result<()>;
+    fn validate_input(&self) -> Result<(), JobSpawnError>;
 }
 
 pub enum JobType {

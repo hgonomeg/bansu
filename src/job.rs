@@ -2,7 +2,7 @@ use super::messages::JobId;
 use actix::prelude::*;
 // use futures_util::FutureExt;
 use job_runner::JobRunner;
-use job_type::Job;
+use job_type::{Job, JobSpawnError};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 pub mod docker;
@@ -52,7 +52,7 @@ impl Actor for JobManager {
 
 pub struct NewJob(pub Box<dyn Job>);
 impl Message for NewJob {
-    type Result = anyhow::Result<(JobId, Addr<JobRunner>)>;
+    type Result = Result<(JobId, Addr<JobRunner>), JobSpawnError>;
 }
 
 pub struct LookupJob(pub JobId);
