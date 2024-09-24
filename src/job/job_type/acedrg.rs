@@ -1,4 +1,4 @@
-use super::{Job, JobType};
+use super::{Job, JobSpawnError, JobType};
 use crate::job::job_handle::{JobHandle, JobProcessConfiguration};
 use crate::job::job_runner::OutputKind;
 use crate::{utils::dump_string_to_file, AcedrgArgs};
@@ -47,7 +47,7 @@ impl Job for AcedrgJob {
         "acedrg"
     }
 
-    fn validate_input(&self) -> anyhow::Result<()> {
+    fn validate_input(&self) -> Result<(), JobSpawnError> {
         // to consider: --bsu, --bsl, --asu, --asl, --res (alias to -r), --numInitConf, --multiconf, --numOptmStep
         let allowed_args: [&str; 25] = [
             "-a",
@@ -80,15 +80,15 @@ impl Job for AcedrgJob {
         let mut numeric_arg = false;
         for arg in self.args.commandline_args.iter() {
             if !(r_arg || numeric_arg) && !allowed_args.iter().any(|z| z == arg) {
-                anyhow::bail!("Input validation failed! Invalid commandline arguments. Supported arguments are: {:?}", &allowed_args);
+                return Err(JobSpawnError::InputValidation(format!("Input validation failed! Invalid commandline arguments. Supported arguments are: {:?}", &allowed_args)));
             }
             if r_arg && !arg.chars().all(|chr| chr.is_alphabetic()) {
-                anyhow::bail!("Input validation failed! Non-alphabetic characters used in monomer name (argument of the flag '-r')");
+                return Err(JobSpawnError::InputValidation(format!("Input validation failed! Non-alphabetic characters used in monomer name (argument of the flag '-r')")));
             }
             if numeric_arg && !arg.chars().all(|chr| chr.is_numeric()) {
-                anyhow::bail!(
+                return Err(JobSpawnError::InputValidation(format!(
                     "Input validation failed! Non-numeric characters used for '-k' or '-j' or '-l'"
-                );
+                )));
             }
             if arg == "-k" || arg == "-j" || arg == "-l" {
                 numeric_arg = true;

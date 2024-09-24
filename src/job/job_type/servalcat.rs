@@ -1,4 +1,4 @@
-use super::{Job, JobType};
+use super::{Job, JobSpawnError, JobType};
 use crate::job::{job_handle::JobHandle, job_runner::OutputKind};
 use std::{
     future::Future,
@@ -46,7 +46,7 @@ impl Job for ServalcatJob {
         todo!()
     }
 
-    fn validate_input(&self) -> anyhow::Result<()> {
+    fn validate_input(&self) -> Result<(), JobSpawnError> {
         todo!()
     }
 }

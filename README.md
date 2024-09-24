@@ -82,7 +82,8 @@ Replies with the following JSON:
 
 Returns:
 * `201 Created` on success
-* `500 Internal Server Error` on error
+* `400 Bad Request` on input validation error
+* `500 Internal Server Error` on all other kinds of errors
 
 ### WEBSOCKET (HTTP GET) `/ws/{job_id}`
 

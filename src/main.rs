@@ -10,7 +10,7 @@ use actix_web_actors::ws;
 pub mod job;
 use job::{
     job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
-    job_type::acedrg::AcedrgJob,
+    job_type::{acedrg::AcedrgJob, JobSpawnError},
     JobManager, LookupJob, NewJob,
 };
 pub mod messages;
@@ -114,9 +114,15 @@ async fn run_acedrg(
             job_id: Some(job_id),
             error_message: None,
         }),
-        Err(e) => {
+        Err(JobSpawnError::InputValidation(e)) => {
+            log::warn!("/run_acedrg - Could not create job: {:#}", &e);
+            HttpResponse::BadRequest().json(JobSpawnReply {
+                job_id: None,
+                error_message: Some(format!("{:#}", e)),
+            })
+        }
+        Err(JobSpawnError::Other(e)) => {
             log::error!("/run_acedrg - Could not create job: {:#}", &e);
-            // todo: different error types?
             HttpResponse::InternalServerError().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some(format!("{:#}", e)),

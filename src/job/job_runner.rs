@@ -1,5 +1,5 @@
 use super::job_handle::JobHandle;
-use super::job_type::Job;
+use super::job_type::{Job, JobSpawnError};
 use super::{JobData, JobFailureReason, JobOutput, JobStatus};
 use crate::utils::*;
 use crate::ws_connection::WsConnection;
@@ -155,7 +155,7 @@ impl JobRunner {
     pub async fn create_job(
         id: String,
         job_object: Box<dyn Job>,
-    ) -> anyhow::Result<Addr<JobRunner>> {
+    ) -> Result<Addr<JobRunner>, JobSpawnError> {
         log::info!("Creating new {} job - {}", job_object.name(), &id);
         job_object.validate_input()?;
         let workdir = mkworkdir()
