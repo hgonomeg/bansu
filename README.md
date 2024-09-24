@@ -2,15 +2,17 @@
 
 Server-side computation API for [Moorhen](https://github.com/moorhen-coot/Moorhen).
 
+Currently it is mostly useful for running Acedrg computations on a server.
+
 ## Design
 
-### Description
+### Basic Description
 
 The server allows you to spawn jobs using HTTP POST requests.
 Each job gets assigned an ID (being an UUID) which can later be used
 to trace the job's progress and to get the computation results.
 
-You can trace job progress by listening on a web socket connection (documented below).
+After a job is spawned, you can trace job progress by listening on a WebSocket connection (documented below).
 
 The ID of your job will be valid for the following amount of time:
 
@@ -20,13 +22,23 @@ The ID of your job will be valid for the following amount of time:
 
 where `T` is the timeout value associated with a given job type.
 
-A temporary working directory is created for each job.
-All data is automatically deleted after job's ID becomes invalid.
-
 The (current) default timeout for `Acedrg` is 2 minutes.
 
+All data is deleted after job's ID becomes invalid i.e. expires.
+
+### Security
+
+All data (temporary directories with all artifacts) is automatically deleted after job's ID becomes invalid.
+Whomever has the ID, can access your data. Treat the ID as both an identifier and a security token.
+
+Keep in mind that not sharing your ID token does not prevent the server administrator from being able to see your data.
+For maximum data security, you may want to run your own instance of Bansu.
+
 For security reasons, the server also supports running jobs
-in Docker containers.
+in Docker containers which is the recommended thing to do.
+
+Running jobs in a Docker container helps to isolate jobs from each other and the rest of the system.
+This greatly reduces the potential impact of a successful exploitation of any vulnerabilities present in Acedrg and Servalcat.
 
 ### Configuration
 
@@ -36,7 +48,7 @@ The following environment variables control the behavior of the server:
 * `RUST_LOG` - sets the log level
 * `BANSU_PORT` - sets the port to listen on
 * `BANSU_ADDRESS` - sets the address to listen on
-* `BANSU_DOCKER` - enables Docker support and sets the name of the Docker image used for running jobs.
+* `BANSU_DOCKER` - enables Docker support and sets the name of the Docker image used for running jobs. If this variable is set, the server will refuse to run if the Docker configuration is invalid
 * `BANSU_ACEDRG_TIMEOUT` - specifies timeout for Acedrg (in seconds)
 
 ### API
@@ -52,6 +64,7 @@ Accepts the following JSON payload:
 {
     "smiles": "Your SMILES string",
     /// An array of additional arguments passed to acedrg
+    /// Note: not all Acedrg arguments are currently available
     "commandline_args: ["-z", "--something"]
 }
 ```
@@ -93,7 +106,7 @@ Progress reports have the following JSON format:
 
 Currently, progress messages are sent only when the connection opens and when the job either fails or completes successfully.
 
-The connection ignores all messages sent to it.
+The connection ignores all messages sent to it (responds only to Ping messages).
 
 Returns `404 Not Found` if the given `job_id` is not valid.
 
