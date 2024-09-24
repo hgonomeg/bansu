@@ -154,9 +154,16 @@ In order to build it:
 
 The image is based on Fedora but can be used on any distribution.
 
-### Testing
+### Testing / Usage example
 
-In order to test Bansu, you can make use of the provided Node.JS script
+In order to test Bansu, you can make use of the provided Node.JS script.
+
+0. Launch the Bansu server
+1. Go to `node_tests/`
+2. Run `npm install` to fetch Node dependencies
+3. Run `node localhost_test.mjs` - it will spawn an Acedrg job, then wait until it finishes (uses the default port: `8080`).
+
+You can also use the script as a reference for implementing communication with Bansu in your project.
 
 ## Name
 
