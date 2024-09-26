@@ -9,6 +9,7 @@ use thiserror::Error;
 use super::{job_handle::JobHandle, job_runner::OutputKind};
 
 pub mod acedrg;
+pub mod chemdrasil;
 pub mod servalcat;
 
 #[derive(Error, Debug)]
@@ -44,4 +45,5 @@ pub trait Job: Send {
 pub enum JobType {
     Acedrg,
     Servalcat,
+    Chemdrasil,
 }
