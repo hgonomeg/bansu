@@ -4,6 +4,7 @@ do_wget() {
   wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 "$@" || exit 7
 }
 
+CHEMDRASIL_VER=0.1.0
 LIBEIGEN_VER=3.4.0
 RDKIT_VER=2024_03_5
 GEMMI_VER=0.6.6
@@ -41,6 +42,19 @@ download_all() {
     # Servalcat
     do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz -O servalcat-${SERVALCAT_VER}.tar.gz &&\
     tar -xf servalcat-${SERVALCAT_VER}.tar.gz
+
+    #Chemdrasil
+    do_wget https://github.com/hgonomeg/chemdrasil/archive/refs/tags/v${CHEMDRASIL_VER}.tar.gz -O chemdrasil-${CHEMDRASIL_VER}.tar.gz &&\
+    tar -xf chemdrasil-${CHEMDRASIL_VER}.tar.gz
+}
+
+build_chemdrasil() {
+  setup_build_env
+  mkdir -p /build/chemdrasil
+  cd /build/chemdrasil &&\
+  rm -rf *
+  cargo install --path /download/chemdrasil-${CHEMDRASIL_VER} --root /usr --target-dir .
+  cd /build
 }
 
 build_eigen() {
@@ -111,6 +125,7 @@ build_all() {
     build_gemmi
     build_servalcat
     build_acedrg
+    build_chemdrasil
 
     # Seems to be necessary for RDKit stuff to be found at runtime
     ldconfig
