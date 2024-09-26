@@ -191,5 +191,6 @@ Combined together gives us:
 ## Todo
 
 * Add max concurrent job limit
+* Add job queueing (after max concurrent job limit is in place)
 * Support for servalcat
 * Think about API design for defining graph-like pipelines (if we ever need that)
