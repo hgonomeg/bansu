@@ -19,7 +19,13 @@ impl Drop for WorkDir {
         let path = std::mem::take(&mut self.path);
         actix_rt::spawn(async move {
             log::info!("Removing temporary directory {}", path.to_string_lossy());
-            let _ = fs::remove_dir_all(path).await;
+            if let Err(e) = fs::remove_dir_all(&path).await {
+                log::warn!(
+                    "Could not remove temporary directory {} : {}",
+                    path.to_string_lossy(),
+                    e
+                );
+            }
         });
     }
 }
