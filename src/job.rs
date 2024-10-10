@@ -4,7 +4,8 @@ use actix::prelude::*;
 use job_runner::JobRunner;
 use job_type::{Job, JobSpawnError};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
+use tokio::sync::Semaphore;
 pub mod docker;
 pub mod job_handle;
 pub mod job_runner;
@@ -44,6 +45,7 @@ impl Message for JobData {
 
 pub struct JobManager {
     jobs: BTreeMap<JobId, Addr<JobRunner>>,
+    concurrent_jobs_semaphore: Option<Arc<Semaphore>>,
 }
 
 impl Actor for JobManager {
@@ -87,6 +89,14 @@ impl Handler<NewJob> for JobManager {
     type Result = ResponseActFuture<Self, <NewJob as actix::Message>::Result>;
 
     fn handle(&mut self, msg: NewJob, _ctx: &mut Self::Context) -> Self::Result {
+        let Ok(perm) = self
+            .concurrent_jobs_semaphore
+            .clone()
+            .map(|sem| sem.try_acquire_owned())
+            .transpose()
+        else {
+            return Box::pin(async move { Err(JobSpawnError::TooManyJobs) }.into_actor(self));
+        };
         let id = loop {
             let new_id = uuid::Uuid::new_v4();
             let id = new_id.to_string();
@@ -98,7 +108,7 @@ impl Handler<NewJob> for JobManager {
         Box::pin(
             async move {
                 let job_object = msg.0;
-                JobRunner::create_job(id.clone(), job_object)
+                JobRunner::create_job(id.clone(), job_object, perm)
                     .await
                     .map(|addr| (id, addr))
             }
@@ -122,10 +132,11 @@ impl Handler<NewJob> for JobManager {
 }
 
 impl JobManager {
-    pub fn new() -> Self {
+    pub fn new(max_jobs: Option<usize>) -> Self {
         log::info!("Initializing JobManager.");
         Self {
             jobs: BTreeMap::new(),
+            concurrent_jobs_semaphore: max_jobs.map(|x| Arc::from(Semaphore::new(x))),
         }
     }
 }

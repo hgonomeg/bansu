@@ -1,12 +1,11 @@
 use super::job_handle::JobHandle;
 use super::job_type::{Job, JobSpawnError};
 use super::{JobData, JobFailureReason, JobOutput, JobStatus};
-use crate::utils::*;
-use crate::ws_connection::WsConnection;
+use crate::{utils::*, ws_connection::WsConnection};
 use actix::prelude::*;
 use anyhow::Context as AnyhowContext;
-use std::process::Output;
-use std::time::Duration;
+use std::{process::Output, time::Duration};
+use tokio::sync::OwnedSemaphorePermit;
 
 use thiserror::Error;
 use tokio::time::timeout;
@@ -145,9 +144,16 @@ impl Handler<OutputFileRequest> for JobRunner {
 }
 
 impl JobRunner {
-    async fn worker(handle: JobHandle, addr: Addr<Self>, id: String, timeout_value: Duration) {
+    async fn worker(
+        handle: JobHandle,
+        addr: Addr<Self>,
+        id: String,
+        timeout_value: Duration,
+        semaphore_permit: Option<OwnedSemaphorePermit>,
+    ) {
         log::info!("{} - Started worker", &id);
         let res = timeout(timeout_value, handle.join()).await;
+        drop(semaphore_permit);
         let _res = addr.send(WorkerResult(res)).await;
         log::info!("{} - Worker terminates", id);
     }
@@ -155,6 +161,7 @@ impl JobRunner {
     pub async fn create_job(
         id: String,
         job_object: Box<dyn Job>,
+        semaphore_permit: Option<OwnedSemaphorePermit>,
     ) -> Result<Addr<JobRunner>, JobSpawnError> {
         log::info!("Creating new {} job - {}", job_object.name(), &id);
         job_object.validate_input()?;
@@ -184,7 +191,8 @@ impl JobRunner {
         };
 
         Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {
-            let worker = JobRunner::worker(jhandle, ctx.address(), id, timeout_val);
+            let worker =
+                JobRunner::worker(jhandle, ctx.address(), id, timeout_val, semaphore_permit);
             let fut = actix::fut::wrap_future(worker);
             ctx.spawn(fut);
             ret

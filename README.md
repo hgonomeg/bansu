@@ -49,7 +49,9 @@ The following environment variables control the behavior of the server:
 * `BANSU_PORT` - sets the port to listen on (`8080` by default)
 * `BANSU_ADDRESS` - sets the address to listen on (`127.0.0.1` by default)
 * `BANSU_DOCKER` - enables Docker support and sets the name of the Docker image used for running jobs. If this variable is set, the server will refuse to run if the Docker configuration is invalid
+* `BANSU_DISALLOW_DOCKERLESS` - can be set to cause Bansu to refuse to run without Docker support
 * `BANSU_ACEDRG_TIMEOUT` - specifies timeout for Acedrg (in seconds) (`120` by default)
+* `BANSU_MAX_CONCURRENT_JOBS` - specifies the maximum number of jobs running in parallel (`20` by default). Use `0` to disable limit.
 
 ### API
 
@@ -83,6 +85,7 @@ Replies with the following JSON:
 Returns:
 * `201 Created` on success
 * `400 Bad Request` on input validation error
+* `503 Service Unavailable` if the server is currently at capacity and is unable to handle your request
 * `500 Internal Server Error` on all other kinds of errors
 
 ### WEBSOCKET (HTTP GET) `/ws/{job_id}`

@@ -121,6 +121,13 @@ async fn run_acedrg(
                 error_message: Some(format!("{:#}", e)),
             })
         }
+        Err(JobSpawnError::TooManyJobs) => {
+            log::warn!("/run_acedrg - Could not create job: Too many jobs");
+            HttpResponse::BadRequest().json(JobSpawnReply {
+                job_id: None,
+                error_message: Some("Sever is at capacity. Please try again later.".to_string()),
+            })
+        }
         Err(JobSpawnError::Other(e)) => {
             log::error!("/run_acedrg - Could not create job: {:#}", &e);
             HttpResponse::InternalServerError().json(JobSpawnReply {
@@ -154,13 +161,18 @@ async fn main() -> anyhow::Result<()> {
             log::error!("Docker test failed - {:#}. Disabling Docker support.", e);
             env::remove_var("BANSU_DOCKER");
         } else {
-            log::info!("Starting with Docker support.");
+            log::info!("Docker test successful.");
         }
     } else {
-        log::info!("Starting without Docker support.");
+        log::info!("Docker configuration was not provided.");
     }
 
     if env::var("BANSU_DOCKER").is_err() {
+        if env::var("BANSU_DISALLOW_DOCKERLESS").is_ok() {
+            let e = anyhow::anyhow!("No (valid) Docker configuration was provided and BANSU_DISALLOW_DOCKERLESS is set. Refusing to continue.");
+            log::error!("{}", &e);
+            return Err(e);
+        }
         log::info!("Testing environment configuration...");
         if let Err(e) = utils::test_dockerless().await {
             log::error!("Environment test failed: {} Refusing to continue without usable 'acedrg' and 'servalcat'.", &e);
@@ -168,7 +180,19 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let job_manager = JobManager::new().start();
+    if env::var("BANSU_DOCKER").is_ok() {
+        log::info!("Starting with Docker support.");
+    } else {
+        log::info!("Starting without Docker support.");
+    }
+
+    let max_concurrent_jobs = env::var("BANSU_MAX_CONCURRENT_JOBS")
+        .ok()
+        .and_then(|port_str| port_str.parse::<usize>().ok())
+        .map(|raw_num| if raw_num == 0 { None } else { Some(raw_num) })
+        .unwrap_or(Some(20));
+
+    let job_manager = JobManager::new(max_concurrent_jobs).start();
     log::info!("Initializing HTTP server...");
     Ok(HttpServer::new(move || {
         App::new()
