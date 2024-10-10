@@ -8,6 +8,7 @@ use actix_web::{
 };
 use actix_web_actors::ws;
 pub mod job;
+use anyhow::Context;
 use job::{
     job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
     job_type::{acedrg::AcedrgJob, JobSpawnError},
@@ -153,7 +154,8 @@ async fn main() -> anyhow::Result<()> {
     let port: u16 = env::var("BANSU_PORT")
         .ok()
         .map(|port_str| port_str.parse::<u16>())
-        .transpose()?
+        .transpose()
+        .with_context(|| "Could not parse port number")?
         .unwrap_or(8080);
 
     if let Ok(docker_image_name) = env::var("BANSU_DOCKER") {
@@ -190,7 +192,8 @@ async fn main() -> anyhow::Result<()> {
     let max_concurrent_jobs = env::var("BANSU_MAX_CONCURRENT_JOBS")
         .ok()
         .map(|port_str| port_str.parse::<usize>())
-        .transpose()?
+        .transpose()
+        .with_context(|| "Could not parse max concurrent job number")?
         .map(|raw_num| if raw_num == 0 { None } else { Some(raw_num) })
         .unwrap_or(Some(20));
 
