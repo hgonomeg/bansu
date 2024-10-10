@@ -124,7 +124,7 @@ async fn run_acedrg(
         }
         Err(JobSpawnError::TooManyJobs) => {
             log::warn!("/run_acedrg - Could not create job: Too many jobs");
-            HttpResponse::BadRequest().json(JobSpawnReply {
+            HttpResponse::ServiceUnavailable().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some("Sever is at capacity. Please try again later.".to_string()),
             })
