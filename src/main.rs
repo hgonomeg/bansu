@@ -196,6 +196,14 @@ async fn main() -> anyhow::Result<()> {
         .with_context(|| "Could not parse max concurrent job number")?
         .map(|raw_num| if raw_num == 0 { None } else { Some(raw_num) })
         .unwrap_or(Some(20));
+    
+    log::info!(
+        "Max concurrent job limit: {}",
+        match max_concurrent_jobs.as_ref() {
+            Some(v) => v.to_string(),
+            None => "No limit".to_string(),
+        }
+    );
 
     let job_manager = JobManager::new(max_concurrent_jobs).start();
     log::info!("Initializing HTTP server...");
