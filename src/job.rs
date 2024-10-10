@@ -8,7 +8,7 @@ use std::{
     collections::{BTreeMap, VecDeque},
     sync::Arc,
 };
-use tokio::sync::Semaphore;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 pub mod docker;
 pub mod job_handle;
 pub mod job_runner;
@@ -84,6 +84,72 @@ pub struct JobManager {
     job_queue: Option<JobQueue>,
 }
 
+impl JobManager {
+    fn handle_new_job(
+        &self,
+        job_object: Box<dyn Job>,
+        id: JobId,
+        perm: Option<OwnedSemaphorePermit>,
+    ) -> ResponseActFuture<Self, <NewJob as actix::Message>::Result> {
+        let tm = job_object.timeout_value();
+        Box::pin(
+            async move {
+                JobRunner::create_job(id.clone(), job_object, perm)
+                    .await
+                    .map(|addr| (id, addr))
+            }
+            .into_actor(self)
+            .map(move |job_res, actor, ctx| {
+                job_res.map(|(jid, job)| {
+                    actor.jobs.insert(jid.clone(), job.clone());
+
+                    // Cleanup task
+                    // Make sure to keep this longer than the job timeout
+                    // We don't have to care if the job is still running or not.
+                    // In the worst-case scenario, it should have timed-out a long time ago.
+                    ctx.notify_later(RemoveJob(jid.clone()), tm * 2);
+
+                    log::info!("Added job with ID={}", &jid);
+                    NewJobResponse {
+                        id: jid,
+                        info: NewJobInfo::Spawned(job),
+                    }
+                })
+            }),
+        )
+    }
+    fn enqueue_job(
+        &mut self,
+        ctx: &mut <Self as actix::Actor>::Context,
+        job_object: Box<dyn Job>,
+        id: JobId,
+    ) -> ResponseActFuture<Self, <NewJob as actix::Message>::Result> {
+        let queue_mut = self.job_queue.as_mut().unwrap();
+        queue_mut.data.push_back((id.clone(), job_object));
+        let queue_pos = queue_mut.data.len();
+        let semaphore = self.concurrent_jobs_semaphore.clone().unwrap();
+        let fut = async move {
+            let perm = semaphore.acquire_owned().await.unwrap();
+            perm
+        }
+        .into_actor(self)
+        .map(move |perm, actor, ctx| {
+            // todo
+            //ctx.spawn()
+        });
+        ctx.spawn(fut);
+        return Box::pin(
+            async move {
+                Ok(NewJobResponse {
+                    id,
+                    info: NewJobInfo::Queued(queue_pos),
+                })
+            }
+            .into_actor(self),
+        );
+    }
+}
+
 impl Handler<LookupJob> for JobManager {
     type Result = <LookupJob as actix::Message>::Result;
 
@@ -111,7 +177,7 @@ impl Handler<RemoveJob> for JobManager {
 impl Handler<NewJob> for JobManager {
     type Result = ResponseActFuture<Self, <NewJob as actix::Message>::Result>;
 
-    fn handle(&mut self, msg: NewJob, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: NewJob, ctx: &mut Self::Context) -> Self::Result {
         let mk_id = || loop {
             let new_id = uuid::Uuid::new_v4();
             let id = new_id.to_string();
@@ -137,18 +203,7 @@ impl Handler<NewJob> for JobManager {
                 if queue.data.len() < queue.max_len {
                     let id = mk_id();
                     //drop(queue);
-                    let queue_mut = self.job_queue.as_mut().unwrap();
-                    queue_mut.data.push_back((id.clone(), msg.0));
-                    let queue_pos = queue_mut.data.len();
-                    return Box::pin(
-                        async move {
-                            Ok(NewJobResponse {
-                                id,
-                                info: NewJobInfo::Queued(queue_pos),
-                            })
-                        }
-                        .into_actor(self),
-                    );
+                    return self.enqueue_job(ctx, msg.0, id);
                 }
                 log::info!("Dropping new job: Queue is full");
             } else {
@@ -157,33 +212,7 @@ impl Handler<NewJob> for JobManager {
             return Box::pin(async move { Err(JobSpawnError::TooManyJobs) }.into_actor(self));
         };
         let id = mk_id();
-        let tm = msg.0.timeout_value();
-        Box::pin(
-            async move {
-                let job_object = msg.0;
-                JobRunner::create_job(id.clone(), job_object, perm)
-                    .await
-                    .map(|addr| (id, addr))
-            }
-            .into_actor(self)
-            .map(move |job_res, actor, ctx| {
-                job_res.map(|(jid, job)| {
-                    actor.jobs.insert(jid.clone(), job.clone());
-
-                    // Cleanup task
-                    // Make sure to keep this longer than the job timeout
-                    // We don't have to care if the job is still running or not.
-                    // In the worst-case scenario, it should have timed-out a long time ago.
-                    ctx.notify_later(RemoveJob(jid.clone()), tm * 2);
-
-                    log::info!("Added job with ID={}", &jid);
-                    NewJobResponse {
-                        id: jid,
-                        info: NewJobInfo::Spawned(job),
-                    }
-                })
-            }),
-        )
+        self.handle_new_job(msg.0, id, perm)
     }
 }
 
