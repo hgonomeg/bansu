@@ -152,7 +152,8 @@ async fn main() -> anyhow::Result<()> {
     let addr = env::var("BANSU_ADDRESS").unwrap_or("127.0.0.1".to_string());
     let port: u16 = env::var("BANSU_PORT")
         .ok()
-        .and_then(|port_str| port_str.parse::<u16>().ok())
+        .map(|port_str| port_str.parse::<u16>())
+        .transpose()?
         .unwrap_or(8080);
 
     if let Ok(docker_image_name) = env::var("BANSU_DOCKER") {
@@ -188,7 +189,8 @@ async fn main() -> anyhow::Result<()> {
 
     let max_concurrent_jobs = env::var("BANSU_MAX_CONCURRENT_JOBS")
         .ok()
-        .and_then(|port_str| port_str.parse::<usize>().ok())
+        .map(|port_str| port_str.parse::<usize>())
+        .transpose()?
         .map(|raw_num| if raw_num == 0 { None } else { Some(raw_num) })
         .unwrap_or(Some(20));
 
