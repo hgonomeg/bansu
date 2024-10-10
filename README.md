@@ -60,7 +60,7 @@ The server exposes the following API:
 Creates `Acedrg` job.
 Accepts the following JSON payload:
 
-```json
+```json5
 {
     "smiles": "Your SMILES string",
     /// An array of additional arguments passed to acedrg
@@ -71,7 +71,7 @@ Accepts the following JSON payload:
 
 Replies with the following JSON:
 
-```json
+```json5
 {
     /// Null on error
     "job_id": "UUID of your job",
@@ -90,7 +90,7 @@ Returns:
 Opens a websocket connection which allows you to track the job's progress.
 Progress reports have the following JSON format:
 
-```json
+```json5
 {
     "status": "Pending | Finished | Failed",
     /// Will be null if the job is still pending, if it timed-out
