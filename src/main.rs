@@ -1,8 +1,11 @@
 use std::env;
 
 use actix::prelude::*;
+use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{
-    get, /*http::StatusCode*/ post,
+    get,
+    middleware::Condition,
+    /*http::StatusCode*/ post,
     web::{self, Data},
     App, HttpRequest, HttpResponse, HttpServer,
 };
@@ -229,9 +232,49 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let job_manager = JobManager::new(max_concurrent_jobs, max_queue_length).start();
+
+    let governor_conf = if env::var("BANSU_DISABLE_RATELIMIT").is_err() {
+        let burst_size = env::var("BANSU_RATELIMIT_BURST_SIZE")
+            .ok()
+            .map(|port_str| port_str.parse::<u32>())
+            .transpose()
+            .with_context(|| "Could not parse rate-limiter burst size")?
+            .unwrap_or(10);
+
+        let sec_per_rq = env::var("BANSU_RATELIMIT_SECONDS_PER_REQUEST")
+            .ok()
+            .map(|port_str| port_str.parse::<u64>())
+            .transpose()
+            .with_context(|| "Could not parse rate-limiter seconds per request")?
+            .unwrap_or(15);
+
+        log::info!(
+            "Rate-limiter configuration: burst_size={} seconds_per_request={}",
+            burst_size,
+            sec_per_rq
+        );
+
+        GovernorConfigBuilder::default()
+            .seconds_per_request(sec_per_rq)
+            .burst_size(burst_size)
+            .finish()
+            .with_context(|| "Invalid rate limiter configuration")?
+    } else {
+        log::info!("Rate-limiter disabled");
+        GovernorConfigBuilder::default()
+            // just in case
+            .permissive(true)
+            .finish()
+            .unwrap()
+    };
+
     log::info!("Initializing HTTP server...");
     Ok(HttpServer::new(move || {
         App::new()
+            .wrap(Condition::new(
+                env::var("BANSU_DISABLE_RATELIMIT").is_err(),
+                Governor::new(&governor_conf),
+            ))
             .app_data(Data::new(job_manager.clone()))
             .service(run_acedrg)
             .service(get_cif)
