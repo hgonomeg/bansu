@@ -12,7 +12,7 @@ use anyhow::Context;
 use job::{
     job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
     job_type::{acedrg::AcedrgJob, JobSpawnError},
-    JobManager, LookupJob, NewJob,
+    JobManager, LookupJob, NewJob, NewJobInfo,
 };
 pub mod messages;
 pub mod utils;
@@ -111,15 +111,24 @@ async fn run_acedrg(
     let jo = Box::from(AcedrgJob { args });
 
     match job_manager.send(NewJob(jo)).await.unwrap() {
-        Ok((job_id, _new_job)) => HttpResponse::Created().json(JobSpawnReply {
-            job_id: Some(job_id),
-            error_message: None,
-        }),
+        Ok(resp) => match resp.info {
+            NewJobInfo::Spawned(_job) => HttpResponse::Created().json(JobSpawnReply {
+                job_id: Some(resp.id),
+                error_message: None,
+                queue_position: None,
+            }),
+            NewJobInfo::Queued(queue_pos) => HttpResponse::Accepted().json(JobSpawnReply {
+                job_id: Some(resp.id),
+                error_message: None,
+                queue_position: Some(queue_pos),
+            }),
+        },
         Err(JobSpawnError::InputValidation(e)) => {
             log::warn!("/run_acedrg - Could not create job: {:#}", &e);
             HttpResponse::BadRequest().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some(format!("{:#}", e)),
+                queue_position: None,
             })
         }
         Err(JobSpawnError::TooManyJobs) => {
@@ -127,6 +136,7 @@ async fn run_acedrg(
             HttpResponse::ServiceUnavailable().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some("Server is at capacity. Please try again later.".to_string()),
+                queue_position: None,
             })
         }
         Err(JobSpawnError::Other(e)) => {
@@ -134,6 +144,7 @@ async fn run_acedrg(
             HttpResponse::InternalServerError().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some(format!("{:#}", e)),
+                queue_position: None,
             })
         }
     }
@@ -189,6 +200,14 @@ async fn main() -> anyhow::Result<()> {
         log::info!("Starting without Docker support.");
     }
 
+    let max_queue_length = env::var("BANSU_MAX_JOB_QUEUE_LENGTH")
+        .ok()
+        .map(|port_str| port_str.parse::<usize>())
+        .transpose()
+        .with_context(|| "Could not parse max job queue length number")?
+        .map(|raw_num| if raw_num == 0 { None } else { Some(raw_num) })
+        .unwrap_or(Some(20));
+
     let max_concurrent_jobs = env::var("BANSU_MAX_CONCURRENT_JOBS")
         .ok()
         .map(|port_str| port_str.parse::<usize>())
@@ -196,16 +215,20 @@ async fn main() -> anyhow::Result<()> {
         .with_context(|| "Could not parse max concurrent job number")?
         .map(|raw_num| if raw_num == 0 { None } else { Some(raw_num) })
         .unwrap_or(Some(20));
-    
+
     log::info!(
-        "Max concurrent job limit: {}",
+        "Max concurrent job limit: {}. Max job queue length: {}.",
         match max_concurrent_jobs.as_ref() {
+            Some(v) => v.to_string(),
+            None => "No limit".to_string(),
+        },
+        match max_queue_length.as_ref() {
             Some(v) => v.to_string(),
             None => "No limit".to_string(),
         }
     );
 
-    let job_manager = JobManager::new(max_concurrent_jobs).start();
+    let job_manager = JobManager::new(max_concurrent_jobs, max_queue_length).start();
     log::info!("Initializing HTTP server...");
     Ok(HttpServer::new(move || {
         App::new()

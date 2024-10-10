@@ -4,7 +4,10 @@ use actix::prelude::*;
 use job_runner::JobRunner;
 use job_type::{Job, JobSpawnError};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    sync::Arc,
+};
 use tokio::sync::Semaphore;
 pub mod docker;
 pub mod job_handle;
@@ -22,6 +25,7 @@ pub enum JobStatus {
     Pending,
     Finished,
     Failed(JobFailureReason),
+    Queued,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,22 +43,29 @@ pub struct JobData {
     /// if the error came from the job executable itself
     pub job_output: Option<JobOutput>,
 }
+
 impl Message for JobData {
     type Result = ();
-}
-
-pub struct JobManager {
-    jobs: BTreeMap<JobId, Addr<JobRunner>>,
-    concurrent_jobs_semaphore: Option<Arc<Semaphore>>,
 }
 
 impl Actor for JobManager {
     type Context = Context<Self>;
 }
 
+pub enum NewJobInfo {
+    Spawned(Addr<JobRunner>),
+    Queued(usize),
+}
+
+pub struct NewJobResponse {
+    pub id: JobId,
+    pub info: NewJobInfo,
+}
+
 pub struct NewJob(pub Box<dyn Job>);
+
 impl Message for NewJob {
-    type Result = Result<(JobId, Addr<JobRunner>), JobSpawnError>;
+    type Result = Result<NewJobResponse, JobSpawnError>;
 }
 
 pub struct LookupJob(pub JobId);
@@ -62,11 +73,23 @@ impl Message for LookupJob {
     type Result = Option<Addr<JobRunner>>;
 }
 
+struct JobQueue {
+    max_len: usize,
+    data: VecDeque<(JobId, Box<dyn Job>)>,
+}
+
+pub struct JobManager {
+    jobs: BTreeMap<JobId, Addr<JobRunner>>,
+    concurrent_jobs_semaphore: Option<Arc<Semaphore>>,
+    job_queue: Option<JobQueue>,
+}
+
 impl Handler<LookupJob> for JobManager {
     type Result = <LookupJob as actix::Message>::Result;
 
     fn handle(&mut self, msg: LookupJob, _ctx: &mut Self::Context) -> Self::Result {
         //log::debug!("Jobs={:?}", self.jobs.keys().collect::<Vec<_>>());
+        log::warn!("TODO: LookupJob has to work with queued jobs!");
         self.jobs.get(&msg.0).cloned()
     }
 }
@@ -89,21 +112,51 @@ impl Handler<NewJob> for JobManager {
     type Result = ResponseActFuture<Self, <NewJob as actix::Message>::Result>;
 
     fn handle(&mut self, msg: NewJob, _ctx: &mut Self::Context) -> Self::Result {
+        let mk_id = || loop {
+            let new_id = uuid::Uuid::new_v4();
+            let id = new_id.to_string();
+            if !self.jobs.contains_key(&id)
+                && self
+                    .job_queue
+                    .as_ref()
+                    .map(|q| q.data.iter().all(|(qj_id, _)| qj_id != &id))
+                    .unwrap_or(true)
+            {
+                break id;
+            }
+        };
         let Ok(perm) = self
             .concurrent_jobs_semaphore
             .clone()
             .map(|sem| sem.try_acquire_owned())
             .transpose()
         else {
+            // Too many concurrent jobs.
+            // We have to either queue the job or drop it.
+            if let Some(queue) = self.job_queue.as_ref() {
+                if queue.data.len() < queue.max_len {
+                    let id = mk_id();
+                    //drop(queue);
+                    let queue_mut = self.job_queue.as_mut().unwrap();
+                    queue_mut.data.push_back((id.clone(), msg.0));
+                    let queue_pos = queue_mut.data.len();
+                    return Box::pin(
+                        async move {
+                            Ok(NewJobResponse {
+                                id,
+                                info: NewJobInfo::Queued(queue_pos),
+                            })
+                        }
+                        .into_actor(self),
+                    );
+                }
+                log::info!("Dropping new job: Queue is full");
+            } else {
+                log::info!("Dropping new job: Too many jobs, queue is disabled");
+            }
             return Box::pin(async move { Err(JobSpawnError::TooManyJobs) }.into_actor(self));
         };
-        let id = loop {
-            let new_id = uuid::Uuid::new_v4();
-            let id = new_id.to_string();
-            if !self.jobs.contains_key(&id) {
-                break id;
-            }
-        };
+        let id = mk_id();
         let tm = msg.0.timeout_value();
         Box::pin(
             async move {
@@ -124,7 +177,10 @@ impl Handler<NewJob> for JobManager {
                     ctx.notify_later(RemoveJob(jid.clone()), tm * 2);
 
                     log::info!("Added job with ID={}", &jid);
-                    (jid, job)
+                    NewJobResponse {
+                        id: jid,
+                        info: NewJobInfo::Spawned(job),
+                    }
                 })
             }),
         )
@@ -132,11 +188,15 @@ impl Handler<NewJob> for JobManager {
 }
 
 impl JobManager {
-    pub fn new(max_jobs: Option<usize>) -> Self {
+    pub fn new(max_jobs: Option<usize>, max_queue_length: Option<usize>) -> Self {
         log::info!("Initializing JobManager.");
         Self {
             jobs: BTreeMap::new(),
             concurrent_jobs_semaphore: max_jobs.map(|x| Arc::from(Semaphore::new(x))),
+            job_queue: max_queue_length.map(|x| JobQueue {
+                max_len: x,
+                data: VecDeque::new(),
+            }),
         }
     }
 }

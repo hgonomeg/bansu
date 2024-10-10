@@ -8,6 +8,7 @@ pub enum JobStatusInfo {
     Pending,
     Finished,
     Failed,
+    Queued,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
@@ -33,6 +34,7 @@ impl From<JobStatus> for JobStatusInfo {
             JobStatus::Pending => JobStatusInfo::Pending,
             JobStatus::Finished => JobStatusInfo::Finished,
             JobStatus::Failed(_) => JobStatusInfo::Failed,
+            JobStatus::Queued => JobStatusInfo::Queued,
         }
     }
 }
@@ -84,6 +86,7 @@ pub struct GenericErrorMessage {
 pub struct JobSpawnReply {
     pub job_id: Option<JobId>,
     pub error_message: Option<String>,
+    pub queue_position: Option<usize>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

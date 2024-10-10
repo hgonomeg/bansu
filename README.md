@@ -52,6 +52,7 @@ The following environment variables control the behavior of the server:
 * `BANSU_DISALLOW_DOCKERLESS` - can be set to cause Bansu to refuse to run without Docker support
 * `BANSU_ACEDRG_TIMEOUT` - specifies timeout for Acedrg (in seconds) (`120` by default)
 * `BANSU_MAX_CONCURRENT_JOBS` - specifies the maximum number of jobs running in parallel (`20` by default). Use `0` to disable limit.
+* `BANSU_MAX_JOB_QUEUE_LENGTH` - specifies the maximum number of jobs waiting in queue to be processed. (`20` by default). Use `0` to disable job queueing.
 
 ### API
 
@@ -83,7 +84,8 @@ Replies with the following JSON:
 ```
 
 Returns:
-* `201 Created` on success
+* `201 Created` on success (job spawned)
+* `202 Accepted` if job has been queued
 * `400 Bad Request` on input validation error
 * `503 Service Unavailable` if the server is currently at capacity and is unable to handle your request
 * `500 Internal Server Error` on all other kinds of errors
@@ -95,7 +97,9 @@ Progress reports have the following JSON format:
 
 ```json5
 {
-    "status": "Pending | Finished | Failed",
+    "status": "Pending | Finished | Failed | Queued",
+    /// Only not-null if the job is queued
+    "queue_position": "number | null",
     /// Will be null if the job is still pending, if it timed-out
     /// or the child process failed due to an I/O error
     "job_output": {
@@ -193,8 +197,6 @@ Combined together gives us:
 
 ## Todo
 
-* Add max concurrent job limit
-* Add job queueing (after max concurrent job limit is in place)
 * Periodically send status updates to websocket connections (to prevent infinite waiting)
 * Support for servalcat
 * Think about API design for defining graph-like pipelines (if we ever need that)
