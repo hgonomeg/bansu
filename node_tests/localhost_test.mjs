@@ -18,6 +18,84 @@ const options = {
   },
 };
 
+function get_cif(job_id) {
+  http.get(`http://localhost:8080/get_cif/${job_id}`, res => {
+    let data = [];
+    console.log('Status Code: ', res.statusCode);
+    if(res.statusCode != 200) {
+      console.error("/get_cif failed!");
+      process.exit(6);
+    }
+  
+    res.on('data', chunk => {
+      data.push(chunk);
+    });
+  
+    res.on('end', () => {
+      console.log('CIF downloaded: ');
+      console.log(Buffer.concat(data).toString());
+      process.exit(0);
+    });
+  }).on('error', err => {
+    console.log('Error: ', err.message);
+    process.exit(7);
+  });
+}
+
+function open_ws_connection(data) {
+  try {
+    const jsonData = JSON.parse(data);
+    console.log("Got json: ", jsonData);
+    if(jsonData.job_id === null) {
+      console.error("Server returned null job id. Error message is: ", jsonData.error_message);
+      console.log("Exiting");
+      process.exit(4);
+    }
+    console.log("Establishing WebSocket connection.");
+    // Create WebSocket connection.
+    const socket = new WebSocket(`ws://localhost:8080/ws/${jsonData.job_id}`);
+
+
+    // Connection opened
+    socket.addEventListener("open", (event) => {
+        console.log("Connection on WebSocket established.");
+    });
+
+    socket.addEventListener("close", (event) => {
+        console.log("Connection on WebSocket closed.");
+        // process.exit(0);
+    });
+
+    socket.addEventListener("error", (event) => {
+        console.error("Connection on WebSocket errored-out: ", event);
+        process.exit(3);
+    });
+
+    // Listen for messages
+    socket.addEventListener("message", (event) => {
+      try {
+        const wsJson = JSON.parse(event.data);
+        if(wsJson.status == "Finished") {
+          const stdout_len = wsJson.job_output.stdout.length;
+          const stderr_len = wsJson.job_output.stderr.length;
+          console.log(`Job has finished successfully! stdout_len: ${stdout_len} stderr_len: ${stderr_len}`);
+          get_cif(jsonData.job_id);
+        } else if(wsJson.status == "Failed") {
+          console.log(`Job failed! ${wsJson.job_output}\n\nError message:${wsJson.error_message}\nFailure reason: ${wsJson.failure_reason}`);
+          process.exit(5);
+        } else {
+          console.log("Websocket message from server ", event.data);
+        }
+        } catch (e) {
+          console.error(e);
+        }
+
+    });
+  } catch(e) {
+    console.error(e);
+  }
+}
+
 const req = http.request(options, (res) => {
   console.log(`STATUS: ${res.statusCode}`);
   console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
@@ -29,41 +107,7 @@ const req = http.request(options, (res) => {
   });
   res.on('end', () => {
     //console.log('No more data in response.');
-    try {
-      const jsonData = JSON.parse(data);
-      console.log("Got json: ", jsonData);
-      if(jsonData.job_id === null) {
-        console.error("Server returned null job id. Error message is: ", jsonData.error_message);
-        console.log("Exiting");
-        process.exit(4);
-      }
-      console.log("Establishing WebSocket connection.");
-      // Create WebSocket connection.
-      const socket = new WebSocket(`ws://localhost:8080/ws/${jsonData.job_id}`);
-
-
-      // Connection opened
-      socket.addEventListener("open", (event) => {
-          console.log("Connection on WebSocket established.");
-      });
-
-      socket.addEventListener("close", (event) => {
-          console.log("Connection on WebSocket closed.");
-          process.exit(0);
-      });
-
-      socket.addEventListener("error", (event) => {
-          console.error("Connection on WebSocket errored-out: ", event);
-          process.exit(3);
-      });
-
-      // Listen for messages
-      socket.addEventListener("message", (event) => {
-          console.log("Websocket message from server ", event.data);
-      });
-    } catch(e) {
-      console.error(e);
-    }
+    open_ws_connection(data);
   });
 });
 
