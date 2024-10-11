@@ -196,6 +196,10 @@ impl Actor for WsConnection {
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
+        let ses = self.session.clone();
+        actix_rt::spawn(async move {
+            let _ = ses.close(None).await;
+        });
         log::info!("Cleaned up WebSocket connection for job {}", self.job_id);
     }
 }
