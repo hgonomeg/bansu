@@ -45,6 +45,7 @@ pub struct WsJobDataUpdate {
     pub job_output: Option<JobOutput>,
     pub failure_reason: Option<JobFailureInfo>,
     pub queue_position: Option<usize>,
+    pub error_message: Option<String>,
 }
 
 impl WsJobDataUpdate {
@@ -54,6 +55,7 @@ impl WsJobDataUpdate {
             job_output: None,
             failure_reason: None,
             queue_position: Some(queue_pos),
+            error_message: None,
         }
     }
 }
@@ -66,6 +68,14 @@ impl From<crate::job::JobData> for WsJobDataUpdate {
                     JobStatus::Failed(f) => Some(JobFailureInfo::from(f)),
                     _ => None,
                 }
+            },
+            error_message: match &value.status {
+                JobStatus::Failed(f) => match f {
+                    JobFailureReason::TimedOut => None,
+                    JobFailureReason::SetupError(e) => Some(e.to_owned()),
+                    JobFailureReason::JobProcessError => None,
+                },
+                _ => None,
             },
             status: JobStatusInfo::from(value.status),
             job_output: value.job_output,

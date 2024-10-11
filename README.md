@@ -113,14 +113,22 @@ Progress reports have the following JSON format:
         "stdout": "A string",
         "stderr": "A string"
     },
-    /// Only not-null if the job failed
+    /// Can be not-null only if the job failed.
+    /// Currently, this only has value for `SetupError` failure reason
     "failure_reason": "TimedOut | JobProcessError | SetupError"
 }
 
 ```
 
-Currently, progress messages are sent only when the connection opens and when the job either fails or completes successfully.
-For queued jobs, listening on a WebSocket also lets you know when the job has become `Pending` or if it could not have been started (including input validation failure and all oher errors).
+Progress messages are sent in the following scenarios:
+
+* When the connection gets established
+* When the job status / `job_output` get updated
+* Periodically, with interval specified in server configuration (useful for estimating how long it may take for a queued job to be processed)
+
+Connection gets automatically closed if the job fails or completes.
+
+For queued jobs which could not have been started, listening on a WebSocket also lets you know why it failed (including input validation failure and all oher errors).
 
 The connection ignores all messages sent to it (responds only to Ping messages).
 
