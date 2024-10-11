@@ -42,9 +42,13 @@ impl From<JobStatus> for JobStatusInfo {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WsJobDataUpdate {
     pub status: JobStatusInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub job_output: Option<JobOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub failure_reason: Option<JobFailureInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub queue_position: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
 }
 
@@ -107,8 +111,11 @@ pub struct GenericErrorMessage {
 
 #[derive(Deserialize, Serialize)]
 pub struct JobSpawnReply {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub job_id: Option<JobId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub queue_position: Option<usize>,
 }
 
