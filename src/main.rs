@@ -1,5 +1,3 @@
-use std::env;
-
 use actix::prelude::*;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{
@@ -10,6 +8,7 @@ use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
+use std::{env, sync::Arc};
 pub mod job;
 use anyhow::Context;
 use job::{
@@ -120,7 +119,7 @@ async fn run_acedrg(
     job_manager: web::Data<Addr<JobManager>>,
 ) -> HttpResponse {
     let args = args.into_inner();
-    let jo = Box::from(AcedrgJob { args });
+    let jo = Arc::from(AcedrgJob { args });
 
     match job_manager.send(NewJob(jo)).await.unwrap() {
         Ok(resp) => match resp.entry {

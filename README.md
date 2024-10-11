@@ -200,7 +200,6 @@ Combined together gives us:
 
 ## Todo
 
-* Invent a way of letting the user know that a queued job failed (through a web socket)
 * Periodically send status updates to websocket connections (to prevent infinite waiting)
 * Migrate to `actix-ws`
 * Support for servalcat

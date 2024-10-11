@@ -63,7 +63,8 @@ pub struct NewJobResponse {
     pub entry: JobEntry,
 }
 
-pub struct NewJob(pub Box<dyn Job>);
+pub struct NewJob(pub Arc<dyn Job>);
+unsafe impl Send for NewJob {}
 
 impl Message for NewJob {
     type Result = Result<NewJobResponse, JobSpawnError>;
@@ -78,15 +79,14 @@ pub struct MonitorQueuedJob(pub JobId, pub Addr<WsConnection>);
 impl Message for MonitorQueuedJob {
     type Result = ();
 }
-
 struct QueuedJob {
     pub id: JobId,
-    pub job_object: Box<dyn Job>,
+    pub job_object: Arc<dyn Job>,
     pub monitors: Vec<Addr<WsConnection>>,
 }
 
 impl QueuedJob {
-    pub fn new(id: JobId, job_object: Box<dyn Job>) -> Self {
+    pub fn new(id: JobId, job_object: Arc<dyn Job>) -> Self {
         Self {
             id,
             job_object,
@@ -109,14 +109,14 @@ pub struct JobManager {
 impl JobManager {
     fn handle_spawn_job(
         &self,
-        job_object: Box<dyn Job>,
+        job_object: Arc<dyn Job>,
         id: JobId,
         perm: Option<OwnedSemaphorePermit>,
     ) -> ResponseActFuture<Self, <NewJob as actix::Message>::Result> {
         let tm = job_object.timeout_value();
         Box::pin(
             async move {
-                JobRunner::create_job(id.clone(), job_object, perm)
+                JobRunner::try_create_job(id.clone(), job_object, perm)
                     .await
                     .map(|addr| (id, addr))
             }
@@ -140,10 +140,30 @@ impl JobManager {
             }),
         )
     }
+    fn handle_job_from_queue(
+        &mut self,
+        ctx: &mut <Self as actix::Actor>::Context,
+        job_object: Arc<dyn Job>,
+        id: JobId,
+        perm: Option<OwnedSemaphorePermit>,
+    ) -> Addr<JobRunner> {
+        let tm = job_object.timeout_value();
+        let runner = JobRunner::create_queued_job(id.clone(), job_object, perm);
+        self.jobs.insert(id.clone(), runner.clone());
+
+        // Cleanup task
+        // Make sure to keep this longer than the job timeout
+        // We don't have to care if the job is still running or not.
+        // In the worst-case scenario, it should have timed-out a long time ago.
+        ctx.notify_later(RemoveJob(id.clone()), tm * 2);
+
+        log::info!("Job with ID={} moved from queue", id);
+        runner
+    }
     fn enqueue_job(
         &mut self,
         ctx: &mut <Self as actix::Actor>::Context,
-        job_object: Box<dyn Job>,
+        job_object: Arc<dyn Job>,
         id: JobId,
     ) -> ResponseActFuture<Self, <NewJob as actix::Message>::Result> {
         log::info!("Enqueuing job with ID={}", &id);
@@ -158,7 +178,7 @@ impl JobManager {
             let perm = semaphore.acquire_owned().await.unwrap();
             perm
         })
-        .then(move |perm, actor, _ctx| {
+        .map(move |perm, actor, ctx| {
             log::debug!("Semaphore permit obtained for queued job. Unqueueing a job...");
             let queued_job = actor.job_queue.as_mut().unwrap().data.pop_front().unwrap();
             log::info!(
@@ -166,34 +186,28 @@ impl JobManager {
                 &queued_job.id,
                 actor.job_queue.as_ref().map(|x| x.data.len()).unwrap_or(0)
             );
-            // TODO: FIXME: When a job has been popped from the queue
-            // and has not yet been spawned, it cannot be queried (ws connection will return 404)
-            actor
-                .handle_spawn_job(queued_job.job_object, queued_job.id.clone(), Some(perm))
-                .map(move |new_job_result, a, ctx| match new_job_result {
-                    Ok(nj) => {
-                        let JobEntry::Spawned(job) = nj.entry else {
-                            panic!("JobEntry::Spawned was expected after job has been spawned and unqueued.");
-                        };
-                        log::debug!("Successfully spawned unqueued job with ID={}", &nj.id);
-                        for i in queued_job.monitors {
-                            let m_job = job.clone();
-                            let id = nj.id.clone();
-                            ctx.spawn(async move {
-                                log::debug!("Notifying WsConnection about job being unqueued (ID={}).", id);
-                                let _ = i.send(SetRunner(m_job)).await;
-                            }.into_actor(a));
-                        }
-                    }
-                    Err(e) => {
-                        log::warn!(
-                            "Failed to spawn queued job with ID={}, error: {:#}",
-                            queued_job.id,
-                            &e
+
+            let job = actor.handle_job_from_queue(
+                ctx,
+                queued_job.job_object,
+                queued_job.id.clone(),
+                Some(perm),
+            );
+
+            for i in queued_job.monitors {
+                let m_job = job.clone();
+                let id = queued_job.id.clone();
+                ctx.spawn(
+                    async move {
+                        log::debug!(
+                            "Notifying WsConnection about job being unqueued (ID={}).",
+                            id
                         );
-                        log::error!("TODO: Handle failed queued job (the user needs to have a way of knowing): {:#}", e);
+                        let _ = i.send(SetRunner(m_job)).await;
                     }
-                })
+                    .into_actor(actor),
+                );
+            }
         });
         ctx.spawn(fut);
         return Box::pin(
@@ -254,6 +268,7 @@ impl Handler<MonitorQueuedJob> for JobManager {
                     .into_actor(self),
                 );
             } else {
+                // This should never happen
                 log::error!("Monitoring of queued job requested but the job is neither in queue nor in the jobs map (ID={})", msg.0);
             }
         }

@@ -4,7 +4,7 @@ use super::{JobData, JobFailureReason, JobOutput, JobStatus};
 use crate::{utils::*, ws_connection::WsConnection};
 use actix::prelude::*;
 use anyhow::Context as AnyhowContext;
-use std::{process::Output, time::Duration};
+use std::{process::Output, sync::Arc, time::Duration};
 use tokio::sync::OwnedSemaphorePermit;
 
 use thiserror::Error;
@@ -18,7 +18,7 @@ pub enum OutputKind {
 pub enum OutputRequestError {
     #[error("IOError {{?}}")]
     IOError(#[from] std::io::Error),
-    #[error("Job is still running")]
+    #[error("Job is still running / is queued")]
     JobStillPending,
     #[error("This output kind is not supported by this job type")]
     OutputKindNotSupported,
@@ -31,8 +31,8 @@ pub struct OutputFileRequest {
 pub struct JobRunner {
     id: String,
     data: JobData,
-    workdir: WorkDir,
-    job_object: Box<dyn Job>,
+    workdir: Option<WorkDir>,
+    job_object: Arc<dyn Job>,
     /// Event propagation
     websocket_addrs: Vec<Addr<WsConnection>>,
 }
@@ -72,6 +72,56 @@ impl Handler<QueryJobData> for JobRunner {
 
     fn handle(&mut self, _msg: QueryJobData, _ctx: &mut Self::Context) -> Self::Result {
         self.data.clone()
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct InitializeQueuedJob(pub Option<OwnedSemaphorePermit>);
+
+impl Handler<InitializeQueuedJob> for JobRunner {
+    type Result = ();
+
+    fn handle(&mut self, msg: InitializeQueuedJob, ctx: &mut Self::Context) -> Self::Result {
+        let id = self.id.clone();
+        let jo = self.job_object.clone();
+        let fut = actix::fut::wrap_future::<_, Self>(async move {
+            log::info!("Initializing queued job");
+            Self::try_init(&id, &jo).await
+        })
+        .map(|res, actor, ctx| {
+            match res {
+                Ok((workdir, jhandle)) => {
+                    log::info!("Queued job initialized successfully (ID={})!", &actor.id);
+                    actor.workdir = Some(workdir);
+                    actor.data.status = JobStatus::Pending;
+                    let timeout_val = actor.job_object.timeout_value();
+                    let worker = JobRunner::worker(
+                        jhandle,
+                        ctx.address(),
+                        actor.id.clone(),
+                        timeout_val,
+                        msg.0,
+                    );
+                    let fut = actix::fut::wrap_future(worker);
+                    ctx.spawn(fut);
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Queued job failed to initialize (ID={}): {:#}",
+                        &actor.id,
+                        &e
+                    );
+                    actor.data.status =
+                        JobStatus::Failed(JobFailureReason::SetupError(format!("{:#}", e)));
+                }
+            }
+            log::debug!("{} - Status updated: {:?}", actor.id, &actor.data.status);
+            for i in &actor.websocket_addrs {
+                i.do_send(actor.data.clone());
+            }
+        });
+        ctx.spawn(fut);
     }
 }
 
@@ -115,16 +165,19 @@ impl Handler<OutputFileRequest> for JobRunner {
     type Result = ResponseActFuture<Self, <OutputFileRequest as actix::Message>::Result>;
 
     fn handle(&mut self, msg: OutputFileRequest, _ctx: &mut Self::Context) -> Self::Result {
-        if self.data.status == JobStatus::Pending {
+        if self.data.status == JobStatus::Pending || self.data.status == JobStatus::Queued {
             log::info!(
-                "{} - Turning down request for output - the job is still pending.",
+                "{} - Turning down request for output - the job is still pending / queued.",
                 self.id
             );
             return Box::pin(async { Err(OutputRequestError::JobStillPending) }.into_actor(self));
         }
+        let jo = &self.job_object;
         let Some(filepath) = self
-            .job_object
-            .output_filename(&self.workdir.path, msg.kind)
+            .workdir
+            .as_ref()
+            .map(|x| jo.output_filename(&x.path, msg.kind))
+            .flatten()
         else {
             return Box::pin(
                 async { Err(OutputRequestError::OutputKindNotSupported) }.into_actor(self),
@@ -157,12 +210,10 @@ impl JobRunner {
         let _res = addr.send(WorkerResult(res)).await;
         log::info!("{} - Worker terminates", id);
     }
-
-    pub async fn create_job(
-        id: String,
-        job_object: Box<dyn Job>,
-        semaphore_permit: Option<OwnedSemaphorePermit>,
-    ) -> Result<Addr<JobRunner>, JobSpawnError> {
+    async fn try_init(
+        id: &str,
+        job_object: &Arc<dyn Job>,
+    ) -> Result<(WorkDir, JobHandle), JobSpawnError> {
         log::info!("Creating new {} job - {}", job_object.name(), &id);
         job_object.validate_input()?;
         let workdir = mkworkdir()
@@ -177,11 +228,19 @@ impl JobRunner {
             .launch(&workdir.path, &input_path)
             .await
             .with_context(|| "Could not start job")?;
+        Ok((workdir, jhandle))
+    }
+    /// Creates a regular (non-queued) job
+    pub async fn try_create_job(
+        id: String,
+        job_object: Arc<dyn Job>,
+        semaphore_permit: Option<OwnedSemaphorePermit>,
+    ) -> Result<Addr<JobRunner>, JobSpawnError> {
+        let (workdir, jhandle) = Self::try_init(&id, &job_object).await?;
         let timeout_val = job_object.timeout_value();
-
         let ret = Self {
             id: id.clone(),
-            workdir,
+            workdir: Some(workdir),
             job_object,
             data: JobData {
                 status: JobStatus::Pending,
@@ -189,7 +248,6 @@ impl JobRunner {
             },
             websocket_addrs: vec![],
         };
-
         Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {
             let worker =
                 JobRunner::worker(jhandle, ctx.address(), id, timeout_val, semaphore_permit);
@@ -197,5 +255,26 @@ impl JobRunner {
             ctx.spawn(fut);
             ret
         }))
+    }
+
+    /// In case of errors, spawns errored-out job
+    pub fn create_queued_job(
+        id: String,
+        job_object: Arc<dyn Job>,
+        semaphore_permit: Option<OwnedSemaphorePermit>,
+    ) -> Addr<JobRunner> {
+        let ret = Self {
+            id: id.clone(),
+            workdir: None,
+            job_object,
+            data: JobData {
+                status: JobStatus::Queued,
+                job_output: None,
+            },
+            websocket_addrs: vec![],
+        }
+        .start();
+        ret.do_send(InitializeQueuedJob(semaphore_permit));
+        ret
     }
 }
