@@ -71,7 +71,7 @@ Accepts the following JSON payload:
     "smiles": "Your SMILES string",
     /// An array of additional arguments passed to acedrg
     /// Note: not all Acedrg arguments are currently available
-    "commandline_args: ["-z", "--something"]
+    "commandline_args": ["-z", "--something"]
 }
 ```
 
@@ -82,7 +82,10 @@ Replies with the following JSON:
     /// Null on error
     "job_id": "UUID of your job",
     /// Null on success
-    "error_message": "Error message if the request failed"
+    "error_message": "Error message if the request failed",
+    /// Position counted from 0
+    /// Null if the job is being processed without a queue
+    "queue_position": 12
 }
 ```
 
@@ -116,6 +119,7 @@ Progress reports have the following JSON format:
 ```
 
 Currently, progress messages are sent only when the connection opens and when the job either fails or completes successfully.
+For queued jobs, listening on a WebSocket also lets you know when the job has become `Pending` or if it could not have been started (including input validation failure and all oher errors).
 
 The connection ignores all messages sent to it (responds only to Ping messages).
 
@@ -200,6 +204,7 @@ Combined together gives us:
 
 ## Todo
 
+* Queue pos in ws messages
 * Periodically send status updates to websocket connections (to prevent infinite waiting)
 * Migrate to `actix-ws`
 * Support for servalcat
