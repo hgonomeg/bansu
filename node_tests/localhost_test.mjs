@@ -2,14 +2,17 @@ import WebSocket from 'ws';
 import * as http from 'http';
 
 
+const addr = process.env.BANSU_ADDRESS ? process.env.BANSU_ADDRESS : "localhost";
+const port = process.env.BANSU_PORT ? process.env.BANSU_PORT : "8080";
+
 const postData = JSON.stringify({
-    'smiles': 'c1ccccc1',
-    'commandline_args': []
+    'smiles': process.env.BANSU_TEST_SMILES ? process.env.BANSU_TEST_SMILES : 'c1ccccc1',
+    'commandline_args': process.env.BANSU_TEST_ACEDRG_ARGS ? eval(process.env.BANSU_TEST_ACEDRG_ARGS) : []
 });
   
 const options = {
-  hostname: 'localhost',
-  port: 8080,
+  hostname: addr,
+  port: port,
   path: '/run_acedrg',
   method: 'POST',
   headers: {
@@ -19,7 +22,7 @@ const options = {
 };
 
 function get_cif(job_id) {
-  http.get(`http://localhost:8080/get_cif/${job_id}`, res => {
+  http.get(`http://${addr}:${port}/get_cif/${job_id}`, res => {
     let data = [];
     console.log('Status Code: ', res.statusCode);
     if(res.statusCode != 200) {
@@ -54,7 +57,7 @@ function open_ws_connection(data) {
     }
     console.log("Establishing WebSocket connection.");
     // Create WebSocket connection.
-    const socket = new WebSocket(`ws://localhost:8080/ws/${jsonData.job_id}`);
+    const socket = new WebSocket(`ws://${addr}:${port}/ws/${jsonData.job_id}`);
 
 
     // Connection opened
