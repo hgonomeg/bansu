@@ -85,7 +85,7 @@ function open_ws_connection(data) {
           console.log(`Job has finished successfully! stdout_len: ${stdout_len} stderr_len: ${stderr_len}`);
           get_cif(jsonData.job_id);
         } else if(wsJson.status == "Failed") {
-          console.log(`Job failed! ${wsJson.job_output}\n\nError message:${wsJson.error_message}\nFailure reason: ${wsJson.failure_reason}`);
+          console.log(`Job failed! ${wsJson.job_output}\n\nError message: ${wsJson.error_message}\nFailure reason: ${wsJson.failure_reason}`);
           process.exit(5);
         } else {
           console.log("Websocket message from server ", event.data);
