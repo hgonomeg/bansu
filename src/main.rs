@@ -111,7 +111,6 @@ async fn job_ws(
     };
     let (response, session, msg_stream) = ws_handle(&req, payload)?;
     WsConnection::new(jm, job_opt, job_id, session, msg_stream);
-    //ws_handle(WsConnection::new(jm, job_opt, job_id), &req, payload)
     Ok(response)
 }
 
