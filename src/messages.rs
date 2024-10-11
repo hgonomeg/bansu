@@ -44,7 +44,18 @@ pub struct WsJobDataUpdate {
     pub status: JobStatusInfo,
     pub job_output: Option<JobOutput>,
     pub failure_reason: Option<JobFailureInfo>,
-    // pub queue_position: Option<usize>
+    pub queue_position: Option<usize>,
+}
+
+impl WsJobDataUpdate {
+    pub fn new_from_queue_pos(queue_pos: usize) -> Self {
+        Self {
+            status: JobStatusInfo::Queued,
+            job_output: None,
+            failure_reason: None,
+            queue_position: Some(queue_pos),
+        }
+    }
 }
 
 impl From<crate::job::JobData> for WsJobDataUpdate {
@@ -58,7 +69,7 @@ impl From<crate::job::JobData> for WsJobDataUpdate {
             },
             status: JobStatusInfo::from(value.status),
             job_output: value.job_output,
-            // queue_position: None
+            queue_position: None,
         }
     }
 }

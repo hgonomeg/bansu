@@ -35,6 +35,29 @@ impl WsConnection {
             }),
         );
     }
+    fn handle_status_update(
+        &self,
+        msg: WsJobDataUpdate,
+        ctx: &mut <Self as actix::Actor>::Context,
+    ) {
+        log::info!("Sending JobDataUpdate for job {}", self.job_id);
+        ctx.text(serde_json::to_string(&msg).unwrap());
+        match msg.status {
+            JobStatusInfo::Finished => {
+                ctx.close(Some(CloseReason {
+                    code: CloseCode::Normal,
+                    description: None,
+                }));
+            }
+            JobStatusInfo::Failed => {
+                ctx.close(Some(CloseReason {
+                    code: CloseCode::Error,
+                    description: None,
+                }));
+            }
+            _ => (),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Message)]
@@ -59,23 +82,7 @@ impl Handler<JobData> for WsConnection {
     type Result = <JobData as actix::Message>::Result;
 
     fn handle(&mut self, msg: JobData, ctx: &mut Self::Context) -> Self::Result {
-        log::info!("Sending JobDataUpdate for job {}", self.job_id);
-        ctx.text(serde_json::to_string(&WsJobDataUpdate::from(msg.clone())).unwrap());
-        match msg.status {
-            JobStatus::Finished => {
-                ctx.close(Some(CloseReason {
-                    code: CloseCode::Normal,
-                    description: None,
-                }));
-            }
-            JobStatus::Failed(_e) => {
-                ctx.close(Some(CloseReason {
-                    code: CloseCode::Error,
-                    description: None,
-                }));
-            }
-            _ => (),
-        }
+        self.handle_status_update(WsJobDataUpdate::from(msg), ctx);
     }
 }
 
