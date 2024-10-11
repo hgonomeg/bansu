@@ -208,6 +208,5 @@ Combined together gives us:
 ## Todo
 
 * Update job output in realtime
-* Migrate to `actix-ws`
 * Support for servalcat
 * Think about API design for defining graph-like pipelines (if we ever need that)
