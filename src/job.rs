@@ -166,6 +166,8 @@ impl JobManager {
                 &queued_job.id,
                 actor.job_queue.as_ref().map(|x| x.data.len()).unwrap_or(0)
             );
+            // TODO: FIXME: When a job has been popped from the queue
+            // and has not yet been spawned, it cannot be queried (ws connection will return 404)
             actor
                 .handle_spawn_job(queued_job.job_object, queued_job.id.clone(), Some(perm))
                 .map(move |new_job_result, a, ctx| match new_job_result {
