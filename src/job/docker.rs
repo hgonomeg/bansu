@@ -72,7 +72,7 @@ impl ContainerHandle {
             }),
             ..Default::default()
         };
-        log::debug!("Creating container \"{}\"", &container_name);
+        log::trace!("Creating container \"{}\"", &container_name);
         let opts = CreateContainerOptions {
             name: container_name.clone(),
             platform: None::<String>,
@@ -87,7 +87,7 @@ impl ContainerHandle {
         //     "Took {} ms to create Docker container",
         //     (creation_time - begin_time).as_millis()
         // );
-        log::info!(
+        log::debug!(
             "Created Docker container with id={} name={}",
             &container.id,
             &container_name
@@ -187,7 +187,7 @@ impl ContainerHandle {
             .unwrap()
             .with_context(|| "Failed to collect logs from the container")?;
 
-        log::info!("Finished running in Docker container {}", &self.id);
+        log::debug!("Finished running in Docker container {}", &self.id);
 
         Ok(ContainerHandleOutput {
             exit_info: exit_info.unwrap(),
@@ -201,7 +201,7 @@ impl Drop for ContainerHandle {
         let id = std::mem::take(&mut self.id);
         let d = self.docker.clone();
         actix_rt::spawn(async move {
-            log::info!("Removing container {}", &id);
+            log::debug!("Removing container {}", &id);
             if let Err(e) = d.remove_container(&id, None).await {
                 log::warn!(
                     "Could not remove container {}: {}. Attempting to stop it...",
