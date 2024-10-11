@@ -1,7 +1,7 @@
 use crate::{
     job::{
         job_runner::{AddWebSocketAddr, JobRunner, QueryJobData},
-        JobData, JobEntry, JobManager, JobStatus, LookupJob, MonitorQueuedJob,
+        JobData, JobEntry, JobManager, LookupJob, MonitorQueuedJob,
     },
     messages::*,
 };
@@ -158,6 +158,9 @@ impl Actor for WsConnection {
             //     status: JobStatus::Queued,
             //     job_output: None,
             // });
+            ctx.add_stream(futures_util::stream::once(async {
+                PeriodicUpdateTrigger {}
+            }));
         }
 
         let sleep_dur = std::time::Duration::from_secs(
@@ -172,7 +175,7 @@ impl Actor for WsConnection {
                         .ok()
                 })
                 .flatten()
-                .unwrap_or(4),
+                .unwrap_or(16),
         );
         ctx.add_stream(futures_util::stream::unfold(
             sleep_dur,
