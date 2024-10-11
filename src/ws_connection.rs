@@ -1,7 +1,7 @@
 use crate::{
     job::{
         job_runner::{AddWebSocketAddr, JobRunner, QueryJobData},
-        JobData, JobManager, JobStatus,
+        JobData, JobManager, JobStatus, MonitorQueuedJob,
     },
     messages::*,
 };
@@ -9,9 +9,50 @@ use actix::prelude::*;
 use actix_web_actors::ws::{self, CloseCode, CloseReason};
 
 pub struct WsConnection {
-    _job_manager: Addr<JobManager>,
-    job: Addr<JobRunner>,
+    job_manager: Addr<JobManager>,
+    job: Option<Addr<JobRunner>>,
     job_id: JobId,
+}
+
+impl WsConnection {
+    fn job_addr_handshake(&self, job: Addr<JobRunner>, ctx: &mut <Self as actix::Actor>::Context) {
+        log::debug!(
+            "Registering WsConnection on JobRunner (ID={})",
+            &self.job_id
+        );
+        job.do_send(AddWebSocketAddr(ctx.address()));
+        let job_id = self.job_id.clone();
+        ctx.spawn(
+            async move {
+                log::debug!("Performing initial fetch of JobData (ID={})", job_id);
+                let data = job.send(QueryJobData).await.unwrap();
+                (data, job_id)
+            }
+            .into_actor(self)
+            .map(|(data, job_id), _a, ctx| {
+                ctx.notify(data);
+                log::debug!("Initial fetch of JobData completed (ID={})", job_id);
+            }),
+        );
+    }
+}
+
+#[derive(Debug, Clone, Message)]
+#[rtype(result = "()")]
+pub struct SetRunner(pub Addr<JobRunner>);
+
+impl Handler<SetRunner> for WsConnection {
+    type Result = <SetRunner as actix::Message>::Result;
+
+    fn handle(&mut self, msg: SetRunner, ctx: &mut Self::Context) -> Self::Result {
+        if self.job.is_some() {
+            log::error!("WsConnection already has JobRunner set!");
+        } else {
+            log::info!("Received JobRunner.");
+            self.job = Some(msg.0.clone());
+            self.job_addr_handshake(msg.0, ctx);
+        }
+    }
 }
 
 impl Handler<JobData> for WsConnection {
@@ -42,19 +83,21 @@ impl Actor for WsConnection {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        self.job.do_send(AddWebSocketAddr(ctx.address()));
-        log::info!("Initializing WebSocket connection for job {}", self.job_id);
-        let job = self.job.clone();
-        ctx.spawn(
-            async move {
-                let data = job.send(QueryJobData).await.unwrap();
-                data
-            }
-            .into_actor(self)
-            .map(|data, _a, ctx| {
-                ctx.notify(data);
-            }),
-        );
+        log::info!("Initializing WebSocket connection for job {}", &self.job_id);
+        if let Some(job) = self.job.clone() {
+            self.job_addr_handshake(job, ctx);
+        } else {
+            let jm = self.job_manager.clone();
+            let id = self.job_id.clone();
+            let addr = ctx.address();
+            ctx.spawn(
+                async move {
+                    log::debug!("Sending a request to monitor queued job (ID={}", &id);
+                    jm.send(MonitorQueuedJob(id, addr)).await.unwrap();
+                }
+                .into_actor(self),
+            );
+        }
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
@@ -63,10 +106,10 @@ impl Actor for WsConnection {
 }
 
 impl WsConnection {
-    pub fn new(job_manager: Addr<JobManager>, job: Addr<JobRunner>, job_id: JobId) -> Self {
+    pub fn new(job_manager: Addr<JobManager>, job: Option<Addr<JobRunner>>, job_id: JobId) -> Self {
         Self {
             job,
-            _job_manager: job_manager,
+            job_manager,
             job_id,
         }
     }

@@ -130,7 +130,7 @@ Returns:
 * `200 OK` on success
 * `404 Not Found` if the given `job_id` is not valid.
 * `500 Internal Server Error` if the output file could not be read
-* `400 Bad Request` if the given `job_id` does is not an `Acedrg` job or if the job is still pending
+* `400 Bad Request` if the given `job_id` does not correspond to an `Acedrg` job or if the job is still pending (or queued)
 
 ## Setup
 

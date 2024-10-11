@@ -15,7 +15,7 @@ use anyhow::Context;
 use job::{
     job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
     job_type::{acedrg::AcedrgJob, JobSpawnError},
-    JobManager, LookupJob, NewJob, NewJobInfo,
+    JobEntry, JobManager, LookupJob, NewJob,
 };
 pub mod messages;
 pub mod utils;
@@ -29,9 +29,14 @@ use ws_connection::WsConnection;
 async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>>) -> HttpResponse {
     let job_id = path.into_inner();
 
-    let Some(job) = job_manager.send(LookupJob(job_id.clone())).await.unwrap() else {
+    let Some(job_entry) = job_manager.send(LookupJob(job_id.clone())).await.unwrap() else {
         log::error!("/get_cif/{} - Job not found", job_id);
         return HttpResponse::NotFound().finish();
+    };
+
+    let JobEntry::Spawned(job) = job_entry else {
+        log::error!("/get_cif/{} - Job is still queued.", job_id);
+        return HttpResponse::BadRequest().finish();
     };
 
     let file_res = job
@@ -91,7 +96,7 @@ async fn job_ws(
     job_manager: web::Data<Addr<JobManager>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let job_id = path.into_inner();
-    let Some(job) = job_manager
+    let Some(job_entry) = job_manager
         .send(LookupJob(job_id.clone()))
         .await
         .ok()
@@ -102,7 +107,11 @@ async fn job_ws(
     };
     let jm = job_manager.get_ref().clone();
     // log::info!("/ws/{} - Establishing ws connection", &job_id);
-    ws::start(WsConnection::new(jm, job, job_id), &req, stream)
+    let job_opt = match job_entry {
+        JobEntry::Spawned(job) => Some(job),
+        JobEntry::Queued(_queue_pos) => None,
+    };
+    ws::start(WsConnection::new(jm, job_opt, job_id), &req, stream)
 }
 
 #[post("/run_acedrg")]
@@ -114,13 +123,13 @@ async fn run_acedrg(
     let jo = Box::from(AcedrgJob { args });
 
     match job_manager.send(NewJob(jo)).await.unwrap() {
-        Ok(resp) => match resp.info {
-            NewJobInfo::Spawned(_job) => HttpResponse::Created().json(JobSpawnReply {
+        Ok(resp) => match resp.entry {
+            JobEntry::Spawned(_job) => HttpResponse::Created().json(JobSpawnReply {
                 job_id: Some(resp.id),
                 error_message: None,
                 queue_position: None,
             }),
-            NewJobInfo::Queued(queue_pos) => HttpResponse::Accepted().json(JobSpawnReply {
+            JobEntry::Queued(queue_pos) => HttpResponse::Accepted().json(JobSpawnReply {
                 job_id: Some(resp.id),
                 error_message: None,
                 queue_position: Some(queue_pos),

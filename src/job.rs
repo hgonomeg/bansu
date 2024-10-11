@@ -1,4 +1,5 @@
 use super::messages::JobId;
+use crate::ws_connection::{SetRunner, WsConnection};
 use actix::prelude::*;
 // use futures_util::FutureExt;
 use job_runner::JobRunner;
@@ -52,14 +53,14 @@ impl Actor for JobManager {
     type Context = Context<Self>;
 }
 
-pub enum NewJobInfo {
+pub enum JobEntry {
     Spawned(Addr<JobRunner>),
     Queued(usize),
 }
 
 pub struct NewJobResponse {
     pub id: JobId,
-    pub info: NewJobInfo,
+    pub entry: JobEntry,
 }
 
 pub struct NewJob(pub Box<dyn Job>);
@@ -70,12 +71,33 @@ impl Message for NewJob {
 
 pub struct LookupJob(pub JobId);
 impl Message for LookupJob {
-    type Result = Option<Addr<JobRunner>>;
+    type Result = Option<JobEntry>;
+}
+
+pub struct MonitorQueuedJob(pub JobId, pub Addr<WsConnection>);
+impl Message for MonitorQueuedJob {
+    type Result = ();
+}
+
+struct QueuedJob {
+    pub id: JobId,
+    pub job_object: Box<dyn Job>,
+    pub monitors: Vec<Addr<WsConnection>>,
+}
+
+impl QueuedJob {
+    pub fn new(id: JobId, job_object: Box<dyn Job>) -> Self {
+        Self {
+            id,
+            job_object,
+            monitors: Vec::new(),
+        }
+    }
 }
 
 struct JobQueue {
-    max_len: usize,
-    data: VecDeque<(JobId, Box<dyn Job>)>,
+    pub max_len: usize,
+    pub data: VecDeque<QueuedJob>,
 }
 
 pub struct JobManager {
@@ -112,7 +134,7 @@ impl JobManager {
                     log::info!("Added job with ID={}", &jid);
                     NewJobResponse {
                         id: jid,
-                        info: NewJobInfo::Spawned(job),
+                        entry: JobEntry::Spawned(job),
                     }
                 })
             }),
@@ -126,7 +148,9 @@ impl JobManager {
     ) -> ResponseActFuture<Self, <NewJob as actix::Message>::Result> {
         log::info!("Enqueuing job with ID={}", &id);
         let queue_mut = self.job_queue.as_mut().unwrap();
-        queue_mut.data.push_back((id.clone(), job_object));
+        queue_mut
+            .data
+            .push_back(QueuedJob::new(id.clone(), job_object));
         let queue_pos = queue_mut.data.len();
 
         let semaphore = self.concurrent_jobs_semaphore.clone().unwrap();
@@ -136,20 +160,36 @@ impl JobManager {
         })
         .then(move |perm, actor, _ctx| {
             log::debug!("Semaphore permit obtained for queued job. Unqueueing a job...");
-            let (id, jo) = actor.job_queue.as_mut().unwrap().data.pop_front().unwrap();
+            let queued_job = actor.job_queue.as_mut().unwrap().data.pop_front().unwrap();
             log::info!(
                 "Processing next job from the queue (ID={}). Jobs remaining in queue: {}",
-                &id,
+                &queued_job.id,
                 actor.job_queue.as_ref().map(|x| x.data.len()).unwrap_or(0)
             );
             actor
-                .handle_spawn_job(jo, id, Some(perm))
-                .map(move |new_job_result, _actor, _ctx| match new_job_result {
+                .handle_spawn_job(queued_job.job_object, queued_job.id.clone(), Some(perm))
+                .map(move |new_job_result, a, ctx| match new_job_result {
                     Ok(nj) => {
-                        log::debug!("Successfully unqueued job with ID={}", &nj.id);
+                        let JobEntry::Spawned(job) = nj.entry else {
+                            panic!("JobEntry::Spawned was expected after job has been spawned and unqueued.");
+                        };
+                        log::debug!("Successfully spawned unqueued job with ID={}", &nj.id);
+                        for i in queued_job.monitors {
+                            let m_job = job.clone();
+                            let id = nj.id.clone();
+                            ctx.spawn(async move {
+                                log::debug!("Notifying WsConnection about job being unqueued (ID={}).", id);
+                                let _ = i.send(SetRunner(m_job)).await;
+                            }.into_actor(a));
+                        }
                     }
                     Err(e) => {
-                        log::error!("TODO: Handle failed queued job: {:#}", e);
+                        log::warn!(
+                            "Failed to spawn queued job with ID={}, error: {:#}",
+                            queued_job.id,
+                            &e
+                        );
+                        log::error!("TODO: Handle failed queued job (the user needs to have a way of knowing): {:#}", e);
                     }
                 })
         });
@@ -158,7 +198,7 @@ impl JobManager {
             async move {
                 Ok(NewJobResponse {
                     id,
-                    info: NewJobInfo::Queued(queue_pos),
+                    entry: JobEntry::Queued(queue_pos),
                 })
             }
             .into_actor(self),
@@ -170,9 +210,51 @@ impl Handler<LookupJob> for JobManager {
     type Result = <LookupJob as actix::Message>::Result;
 
     fn handle(&mut self, msg: LookupJob, _ctx: &mut Self::Context) -> Self::Result {
-        //log::debug!("Jobs={:?}", self.jobs.keys().collect::<Vec<_>>());
-        log::warn!("TODO: LookupJob has to work with queued jobs!");
-        self.jobs.get(&msg.0).cloned()
+        match self.jobs.get(&msg.0) {
+            Some(j) => Some(JobEntry::Spawned(j.clone())),
+            None => self
+                .job_queue
+                .as_ref()
+                .map(|q| {
+                    q.data
+                        .iter()
+                        .enumerate()
+                        .find(|(_ord_num, qj)| *qj.id == msg.0)
+                })
+                .flatten()
+                .map(|(ord_num, _rest)| JobEntry::Queued(ord_num + 1)),
+        }
+    }
+}
+
+impl Handler<MonitorQueuedJob> for JobManager {
+    type Result = <MonitorQueuedJob as actix::Message>::Result;
+
+    fn handle(&mut self, msg: MonitorQueuedJob, ctx: &mut Self::Context) -> Self::Result {
+        if let Some(q_job) = self
+            .job_queue
+            .as_mut()
+            .map(|q| q.data.iter_mut().find(|qj| qj.id == msg.0))
+            .flatten()
+        {
+            q_job.monitors.push(msg.1);
+        } else {
+            if let Some(job) = self.jobs.get(&msg.0).cloned() {
+                let id = msg.0;
+                ctx.spawn(
+                    async move {
+                        log::debug!(
+                            "Immediately notifying WsConnection about job being unqueued (ID={}).",
+                            id
+                        );
+                        let _ = msg.1.send(SetRunner(job)).await;
+                    }
+                    .into_actor(self),
+                );
+            } else {
+                log::error!("Monitoring of queued job requested but the job is neither in queue nor in the jobs map (ID={})", msg.0);
+            }
+        }
     }
 }
 
@@ -201,7 +283,7 @@ impl Handler<NewJob> for JobManager {
                 && self
                     .job_queue
                     .as_ref()
-                    .map(|q| q.data.iter().all(|(qj_id, _)| qj_id != &id))
+                    .map(|q| q.data.iter().all(|qj| qj.id != id))
                     .unwrap_or(true)
             {
                 break id;
