@@ -39,33 +39,50 @@ impl WsConnection {
             }),
         );
     }
-    async fn handle_status_update(
-        job_id: JobId,
-        msg: WsJobDataUpdate,
-        mut session: Session,
-    ) -> Result<(), actix_ws::Closed> {
-        log::debug!("Sending JobDataUpdate for job {}", job_id);
-        session.text(serde_json::to_string(&msg).unwrap()).await?;
-        match msg.status {
-            JobStatusInfo::Finished => {
-                session
-                    .close(Some(CloseReason {
-                        code: CloseCode::Normal,
-                        description: None,
-                    }))
-                    .await?;
+    fn handle_status_update(&self, ctx: &mut Context<Self>, msg: WsJobDataUpdate) {
+        let mut session = self.session.clone();
+        let job_id = self.job_id.clone();
+        ctx.spawn(
+            async move {
+                log::debug!("Sending JobDataUpdate for job {}", job_id);
+                session.text(serde_json::to_string(&msg).unwrap()).await?;
+                let mut should_stop = false;
+                match msg.status {
+                    JobStatusInfo::Finished => {
+                        let _ = session
+                            .close(Some(CloseReason {
+                                code: CloseCode::Normal,
+                                description: None,
+                            }))
+                            .await;
+                        should_stop = true;
+                    }
+                    JobStatusInfo::Failed => {
+                        let _ = session
+                            .close(Some(CloseReason {
+                                code: CloseCode::Error,
+                                description: None,
+                            }))
+                            .await;
+                        should_stop = true;
+                    }
+                    _ => (),
+                }
+                Ok::<bool, actix_ws::Closed>(should_stop)
             }
-            JobStatusInfo::Failed => {
-                session
-                    .close(Some(CloseReason {
-                        code: CloseCode::Error,
-                        description: None,
-                    }))
-                    .await?;
-            }
-            _ => (),
-        }
-        Ok(())
+            .into_actor(self)
+            .map(|res, a, ctx| match res {
+                Ok(should_stop) => {
+                    if should_stop {
+                        ctx.stop();
+                    }
+                }
+                Err(e) => {
+                    log::error!("JobDataUpdate could not be sent: {} (ID={})", e, &a.job_id);
+                    ctx.stop();
+                }
+            }),
+        );
     }
 }
 
@@ -128,10 +145,10 @@ impl Handler<PeriodicUpdateTrigger> for WsConnection {
                     },
                 }
                 (job_id, None)
-            }).map(|(job_id, queue_pos_opt), actor: &mut Self, _ctx| {
+            }).map(|(job_id, queue_pos_opt), actor: &mut Self, ctx| {
                 if let Some(queue_pos) = queue_pos_opt {
                     log::debug!("Periodic lookup of queued job completed (ID={})", job_id);
-                    actix::spawn(Self::handle_status_update(job_id, WsJobDataUpdate::new_from_queue_pos(queue_pos), actor.session.clone()));
+                    actor.handle_status_update(ctx, WsJobDataUpdate::new_from_queue_pos(queue_pos));
                 }
             }));
         }
@@ -147,13 +164,8 @@ impl StreamHandler<PeriodicUpdateTrigger> for WsConnection {
 impl Handler<JobData> for WsConnection {
     type Result = <JobData as actix::Message>::Result;
 
-    fn handle(&mut self, msg: JobData, _ctx: &mut Self::Context) -> Self::Result {
-        let id = self.job_id.clone();
-        actix_rt::spawn(Self::handle_status_update(
-            id,
-            WsJobDataUpdate::from(msg),
-            self.session.clone(),
-        ));
+    fn handle(&mut self, msg: JobData, ctx: &mut Self::Context) -> Self::Result {
+        self.handle_status_update(ctx, WsJobDataUpdate::from(msg));
     }
 }
 
