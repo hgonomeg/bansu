@@ -137,7 +137,11 @@ impl JobManager {
         .then(move |perm, actor, _ctx| {
             log::debug!("Semaphore permit obtained for queued job. Unqueueing a job...");
             let (id, jo) = actor.job_queue.as_mut().unwrap().data.pop_front().unwrap();
-            log::info!("Processing next job from the queue (ID={})", &id);
+            log::info!(
+                "Processing next job from the queue (ID={}). Jobs remaining in queue: {}",
+                &id,
+                actor.job_queue.as_ref().map(|x| x.data.len()).unwrap_or(0)
+            );
             actor
                 .handle_new_job(jo, id, Some(perm))
                 .map(move |new_job_result, _actor, _ctx| match new_job_result {
