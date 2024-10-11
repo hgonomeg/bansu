@@ -50,6 +50,7 @@ The following environment variables control the behavior of the server:
 * `BANSU_ADDRESS` - sets the address to listen on (`127.0.0.1` by default)
 * `BANSU_DOCKER` - enables Docker support and sets the name of the Docker image used for running jobs. If this variable is set, the server will refuse to run if the Docker configuration is invalid
 * `BANSU_DISALLOW_DOCKERLESS` - can be set to cause Bansu to refuse to run without Docker support
+* `BANSU_PERIODIC_WS_UPDATE_INTERVAL` - specifies the interval at which web socket connections send periodic status updates (in seconds; `4` by default)
 * `BANSU_ACEDRG_TIMEOUT` - specifies timeout for Acedrg (in seconds) (`120` by default)
 * `BANSU_MAX_CONCURRENT_JOBS` - specifies the maximum number of jobs running in parallel (`20` by default). Use `0` to disable limit.
 * `BANSU_MAX_JOB_QUEUE_LENGTH` - specifies the maximum number of jobs waiting in queue to be processed. (`20` by default). Use `0` to disable job queueing.
@@ -204,8 +205,6 @@ Combined together gives us:
 
 ## Todo
 
-* Queue pos in ws messages
-* Periodically send status updates to websocket connections (to prevent infinite waiting)
 * Update job output in realtime
 * Migrate to `actix-ws`
 * Support for servalcat

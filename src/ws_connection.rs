@@ -1,7 +1,7 @@
 use crate::{
     job::{
         job_runner::{AddWebSocketAddr, JobRunner, QueryJobData},
-        JobData, JobManager, JobStatus, MonitorQueuedJob,
+        JobData, JobEntry, JobManager, JobStatus, LookupJob, MonitorQueuedJob,
     },
     messages::*,
 };
@@ -78,6 +78,55 @@ impl Handler<SetRunner> for WsConnection {
     }
 }
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct PeriodicUpdateTrigger;
+
+impl StreamHandler<PeriodicUpdateTrigger> for WsConnection {
+    fn handle(&mut self, _item: PeriodicUpdateTrigger, ctx: &mut Self::Context) {
+        let job_id = self.job_id.clone();
+        if let Some(job) = self.job.clone() {
+            ctx.spawn(
+                async move {
+                    log::debug!("Performing periodic fetch of JobData (ID={})", job_id);
+                    let data = job.send(QueryJobData).await.unwrap();
+                    (data, job_id)
+                }
+                .into_actor(self)
+                .map(|(data, job_id), _a, ctx| {
+                    ctx.notify(data);
+                    log::debug!("Periodic fetch of JobData completed (ID={})", job_id);
+                }),
+            );
+        } else {
+            let mgr = self.job_manager.clone();
+            ctx.spawn(actix::fut::wrap_future(async move {
+                log::debug!("Performing periodic lookup of queued job (ID={})", &job_id);
+                match mgr.send(LookupJob(job_id.clone())).await {
+                    Ok(Some(JobEntry::Queued(queue_pos))) => {
+                        return(job_id, Some(queue_pos));
+                    },
+                    Ok(Some(JobEntry::Spawned(_))) => {
+                        log::warn!("Ignoring spawned job address sent from queued-job lookup. It should soon be registered anyway. ID={}", &job_id);
+                    },
+                    Ok(None) => {
+                        log::error!("Job not found during periodic lookup of queued job! (ID={})", &job_id);
+                    },
+                    Err(e) => {
+                        log::error!("Periodic lookup of queued job failed! {}", &e);
+                    },
+                }
+                (job_id, None)
+            }).map(|(job_id, queue_pos_opt), actor: &mut Self, ctx| {
+                if let Some(queue_pos) = queue_pos_opt {
+                    log::debug!("Periodic lookup of queued job completed (ID={})", job_id);
+                    actor.handle_status_update(WsJobDataUpdate::new_from_queue_pos(queue_pos), ctx);
+                }
+            }));
+        }
+    }
+}
+
 impl Handler<JobData> for WsConnection {
     type Result = <JobData as actix::Message>::Result;
 
@@ -110,6 +159,28 @@ impl Actor for WsConnection {
                 job_output: None,
             });
         }
+
+        let sleep_dur = std::time::Duration::from_secs(
+            std::env::var("BANSU_PERIODIC_WS_UPDATE_INTERVAL")
+                .ok()
+                .map(|port_str| {
+                    port_str
+                        .parse::<u64>()
+                        .inspect_err(|e| {
+                            log::warn!("Invalid BANSU_PERIODIC_WS_UPDATE_INTERVAL value: {}", e)
+                        })
+                        .ok()
+                })
+                .flatten()
+                .unwrap_or(4),
+        );
+        ctx.add_stream(futures_util::stream::unfold(
+            sleep_dur,
+            |sleep_dur| async move {
+                tokio::time::sleep(sleep_dur.clone()).await;
+                Some((PeriodicUpdateTrigger, sleep_dur))
+            },
+        ));
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
