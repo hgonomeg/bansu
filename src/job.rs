@@ -85,7 +85,7 @@ pub struct JobManager {
 }
 
 impl JobManager {
-    fn handle_new_job(
+    fn handle_spawn_job(
         &self,
         job_object: Box<dyn Job>,
         id: JobId,
@@ -143,7 +143,7 @@ impl JobManager {
                 actor.job_queue.as_ref().map(|x| x.data.len()).unwrap_or(0)
             );
             actor
-                .handle_new_job(jo, id, Some(perm))
+                .handle_spawn_job(jo, id, Some(perm))
                 .map(move |new_job_result, _actor, _ctx| match new_job_result {
                     Ok(nj) => {
                         log::debug!("Successfully unqueued job with ID={}", &nj.id);
@@ -228,7 +228,7 @@ impl Handler<NewJob> for JobManager {
             return Box::pin(async move { Err(JobSpawnError::TooManyJobs) }.into_actor(self));
         };
         let id = mk_id();
-        self.handle_new_job(msg.0, id, perm)
+        self.handle_spawn_job(msg.0, id, perm)
     }
 }
 
