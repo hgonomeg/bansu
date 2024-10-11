@@ -197,15 +197,17 @@ impl JobManager {
             for i in queued_job.monitors {
                 let m_job = job.clone();
                 let id = queued_job.id.clone();
-                ctx.spawn(
+                actix_rt::spawn(
                     async move {
                         log::debug!(
                             "Notifying WsConnection about job being unqueued (ID={}).",
-                            id
+                            &id
                         );
-                        let _ = i.send(SetRunner(m_job)).await;
+                        if let Err(e) = i.send(SetRunner(m_job)).await {
+                            log::warn!("WsConnection could not be notified about job being unqueued (ID={}): {}.",
+                            &id, e);
+                        }
                     }
-                    .into_actor(actor),
                 );
             }
         });
@@ -263,7 +265,10 @@ impl Handler<MonitorQueuedJob> for JobManager {
                             "Immediately notifying WsConnection about job being unqueued (ID={}).",
                             id
                         );
-                        let _ = msg.1.send(SetRunner(job)).await;
+                        if let Err(e) = msg.1.send(SetRunner(job)).await {
+                            log::warn!("WsConnection could not be notified about job being unqueued (ID={}): {}.",
+                            &id, e);
+                        }
                     }
                     .into_actor(self),
                 );

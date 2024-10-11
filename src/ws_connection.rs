@@ -91,7 +91,9 @@ impl Handler<SetRunner> for WsConnection {
 #[rtype(result = "()")]
 pub struct PeriodicUpdateTrigger;
 
-impl StreamHandler<PeriodicUpdateTrigger> for WsConnection {
+impl Handler<PeriodicUpdateTrigger> for WsConnection {
+    type Result = ();
+
     fn handle(&mut self, _item: PeriodicUpdateTrigger, ctx: &mut Self::Context) {
         let job_id = self.job_id.clone();
         if let Some(job) = self.job.clone() {
@@ -136,6 +138,12 @@ impl StreamHandler<PeriodicUpdateTrigger> for WsConnection {
     }
 }
 
+impl StreamHandler<PeriodicUpdateTrigger> for WsConnection {
+    fn handle(&mut self, item: PeriodicUpdateTrigger, ctx: &mut Self::Context) {
+        ctx.notify(item);
+    }
+}
+
 impl Handler<JobData> for WsConnection {
     type Result = <JobData as actix::Message>::Result;
 
@@ -152,7 +160,7 @@ impl Handler<JobData> for WsConnection {
 impl Actor for WsConnection {
     type Context = Context<Self>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn started(&mut self, ctx: &mut <Self as actix::Actor>::Context) {
         log::info!("Initializing WebSocket connection for job {}", &self.job_id);
         if let Some(job) = self.job.clone() {
             self.job_addr_handshake(job, ctx);
@@ -165,11 +173,12 @@ impl Actor for WsConnection {
                     log::debug!("Sending a request to monitor queued job (ID={}", &id);
                     jm.send(MonitorQueuedJob(id, addr)).await.unwrap();
                 }
-                .into_actor(self),
+                .into_actor(self)
+                .map(|_, _actor, ctx| {
+                    // log::debug!("MONITORED; ADDING ONESHOT");
+                    ctx.notify(PeriodicUpdateTrigger {});
+                }),
             );
-            ctx.add_stream(futures_util::stream::once(async {
-                PeriodicUpdateTrigger {}
-            }));
         }
 
         let sleep_dur = std::time::Duration::from_secs(
