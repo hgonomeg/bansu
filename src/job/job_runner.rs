@@ -205,7 +205,11 @@ impl JobRunner {
         semaphore_permit: Option<OwnedSemaphorePermit>,
     ) {
         log::info!("{} - Started worker", &id);
-        let res = timeout(timeout_value, handle.join()).await;
+        let worker_fut = async move {
+            // TODO: Implement updating job output realtime
+            handle.join().await
+        };
+        let res = timeout(timeout_value, worker_fut).await;
         drop(semaphore_permit);
         let _res = addr.send(WorkerResult(res)).await;
         log::info!("{} - Worker terminates", id);
