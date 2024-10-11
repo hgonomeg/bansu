@@ -6,12 +6,16 @@ use crate::{
     messages::*,
 };
 use actix::prelude::*;
-use actix_web_actors::ws::{self, CloseCode, CloseReason};
+use actix_ws::{
+    CloseCode, CloseReason, Message as WsMessage, MessageStream, ProtocolError as WsProtocolError,
+    Session,
+};
 
 pub struct WsConnection {
     job_manager: Addr<JobManager>,
     job: Option<Addr<JobRunner>>,
     job_id: JobId,
+    session: Session,
 }
 
 impl WsConnection {
@@ -35,28 +39,33 @@ impl WsConnection {
             }),
         );
     }
-    fn handle_status_update(
-        &self,
+    async fn handle_status_update(
+        job_id: JobId,
         msg: WsJobDataUpdate,
-        ctx: &mut <Self as actix::Actor>::Context,
-    ) {
-        log::debug!("Sending JobDataUpdate for job {}", self.job_id);
-        ctx.text(serde_json::to_string(&msg).unwrap());
+        mut session: Session,
+    ) -> Result<(), actix_ws::Closed> {
+        log::debug!("Sending JobDataUpdate for job {}", job_id);
+        session.text(serde_json::to_string(&msg).unwrap()).await?;
         match msg.status {
             JobStatusInfo::Finished => {
-                ctx.close(Some(CloseReason {
-                    code: CloseCode::Normal,
-                    description: None,
-                }));
+                session
+                    .close(Some(CloseReason {
+                        code: CloseCode::Normal,
+                        description: None,
+                    }))
+                    .await?;
             }
             JobStatusInfo::Failed => {
-                ctx.close(Some(CloseReason {
-                    code: CloseCode::Error,
-                    description: None,
-                }));
+                session
+                    .close(Some(CloseReason {
+                        code: CloseCode::Error,
+                        description: None,
+                    }))
+                    .await?;
             }
             _ => (),
         }
+        Ok(())
     }
 }
 
@@ -117,10 +126,10 @@ impl StreamHandler<PeriodicUpdateTrigger> for WsConnection {
                     },
                 }
                 (job_id, None)
-            }).map(|(job_id, queue_pos_opt), actor: &mut Self, ctx| {
+            }).map(|(job_id, queue_pos_opt), actor: &mut Self, _ctx| {
                 if let Some(queue_pos) = queue_pos_opt {
                     log::debug!("Periodic lookup of queued job completed (ID={})", job_id);
-                    actor.handle_status_update(WsJobDataUpdate::new_from_queue_pos(queue_pos), ctx);
+                    actix::spawn(Self::handle_status_update(job_id, WsJobDataUpdate::new_from_queue_pos(queue_pos), actor.session.clone()));
                 }
             }));
         }
@@ -130,13 +139,18 @@ impl StreamHandler<PeriodicUpdateTrigger> for WsConnection {
 impl Handler<JobData> for WsConnection {
     type Result = <JobData as actix::Message>::Result;
 
-    fn handle(&mut self, msg: JobData, ctx: &mut Self::Context) -> Self::Result {
-        self.handle_status_update(WsJobDataUpdate::from(msg), ctx);
+    fn handle(&mut self, msg: JobData, _ctx: &mut Self::Context) -> Self::Result {
+        let id = self.job_id.clone();
+        actix_rt::spawn(Self::handle_status_update(
+            id,
+            WsJobDataUpdate::from(msg),
+            self.session.clone(),
+        ));
     }
 }
 
 impl Actor for WsConnection {
-    type Context = ws::WebsocketContext<Self>;
+    type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         log::info!("Initializing WebSocket connection for job {}", &self.job_id);
@@ -192,20 +206,27 @@ impl Actor for WsConnection {
 }
 
 impl WsConnection {
-    pub fn new(job_manager: Addr<JobManager>, job: Option<Addr<JobRunner>>, job_id: JobId) -> Self {
-        Self {
-            job,
-            job_manager,
-            job_id,
-        }
+    pub fn new(
+        job_manager: Addr<JobManager>,
+        job: Option<Addr<JobRunner>>,
+        job_id: JobId,
+        session: Session,
+        msg_stream: MessageStream,
+    ) -> Addr<Self> {
+        Self::create(|ctx| {
+            ctx.add_stream(msg_stream);
+            Self {
+                job,
+                job_manager,
+                job_id,
+                session,
+            }
+        })
     }
-    // fn query_job(&self, _job_id: JobId) {
-
-    // }
 }
 
-impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
-    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+impl StreamHandler<Result<WsMessage, WsProtocolError>> for WsConnection {
+    fn handle(&mut self, msg: Result<WsMessage, WsProtocolError>, _ctx: &mut Self::Context) {
         // let mut error_out = |error_msg: &str| {
         //     ctx.text(
         //         serde_json::to_string(&GenericErrorMessage {
@@ -217,11 +238,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
         // };
 
         match msg {
-            Ok(ws::Message::Ping(_msg)) => {
-                ctx.pong(&[]);
+            Ok(WsMessage::Ping(_msg)) => {
+                let mut ses = self.session.clone();
+                let fut = async move {
+                    let _ = ses.pong(&[]).await;
+                };
+                actix_rt::spawn(fut);
                 log::info!("{} - Replying with \"Pong\"", &self.job_id);
             }
-            Ok(ws::Message::Text(_text)) => {
+            Ok(WsMessage::Text(_text)) => {
                 log::info!("{} - Ignoring incoming text message.", &self.job_id);
                 // let client_message = serde_json::from_str::<WsClientMessage>(&text);
                 // match client_message {
@@ -239,7 +264,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
                 //     }
                 // }
             }
-            Ok(ws::Message::Binary(_bin)) => {
+            Ok(WsMessage::Binary(_bin)) => {
                 log::info!("{} - Ignoring incoming binary message.", &self.job_id);
                 //ctx.binary(bin)
             }

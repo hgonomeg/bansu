@@ -7,7 +7,7 @@ use actix_web::{
     web::{self, Data},
     App, HttpRequest, HttpResponse, HttpServer,
 };
-use actix_web_actors::ws;
+use actix_ws::handle as ws_handle;
 use std::{env, sync::Arc};
 pub mod job;
 use anyhow::Context;
@@ -60,7 +60,7 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
         }
         Ok(mut file) => {
             let (tx, rx) = tokio::sync::mpsc::channel::<Result<web::Bytes, std::io::Error>>(64);
-            tokio::task::spawn(async move {
+            actix_rt::spawn(async move {
                 log::info!("/get_cif/{} - Replying with CIF file", job_id);
                 loop {
                     let mut buf = web::BytesMut::with_capacity(65536);
@@ -91,7 +91,7 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
 async fn job_ws(
     path: web::Path<JobId>,
     req: HttpRequest,
-    stream: web::Payload,
+    payload: web::Payload,
     job_manager: web::Data<Addr<JobManager>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let job_id = path.into_inner();
@@ -105,12 +105,14 @@ async fn job_ws(
         return Ok(HttpResponse::NotFound().finish());
     };
     let jm = job_manager.get_ref().clone();
-    // log::info!("/ws/{} - Establishing ws connection", &job_id);
     let job_opt = match job_entry {
         JobEntry::Spawned(job) => Some(job),
         JobEntry::Queued(_queue_pos) => None,
     };
-    ws::start(WsConnection::new(jm, job_opt, job_id), &req, stream)
+    let (response, session, msg_stream) = ws_handle(&req, payload)?;
+    WsConnection::new(jm, job_opt, job_id, session, msg_stream);
+    //ws_handle(WsConnection::new(jm, job_opt, job_id), &req, payload)
+    Ok(response)
 }
 
 #[post("/run_acedrg")]
