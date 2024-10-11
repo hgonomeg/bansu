@@ -124,18 +124,30 @@ impl JobManager {
         job_object: Box<dyn Job>,
         id: JobId,
     ) -> ResponseActFuture<Self, <NewJob as actix::Message>::Result> {
+        log::info!("Enqueuing job with ID={}", &id);
         let queue_mut = self.job_queue.as_mut().unwrap();
         queue_mut.data.push_back((id.clone(), job_object));
         let queue_pos = queue_mut.data.len();
+
         let semaphore = self.concurrent_jobs_semaphore.clone().unwrap();
-        let fut = async move {
+        let fut = actix::fut::wrap_future::<_, Self>(async move {
             let perm = semaphore.acquire_owned().await.unwrap();
             perm
-        }
-        .into_actor(self)
-        .map(move |perm, actor, ctx| {
-            // todo
-            //ctx.spawn()
+        })
+        .then(move |perm, actor, _ctx| {
+            log::debug!("Semaphore permit obtained for queued job. Unqueueing a job...");
+            let (id, jo) = actor.job_queue.as_mut().unwrap().data.pop_front().unwrap();
+            log::info!("Processing next job from the queue (ID={})", &id);
+            actor
+                .handle_new_job(jo, id, Some(perm))
+                .map(move |new_job_result, _actor, _ctx| match new_job_result {
+                    Ok(nj) => {
+                        log::debug!("Successfully unqueued job with ID={}", &nj.id);
+                    }
+                    Err(e) => {
+                        log::error!("TODO: Handle failed queued job: {:#}", e);
+                    }
+                })
         });
         ctx.spawn(fut);
         return Box::pin(
