@@ -196,7 +196,7 @@ impl Actor for WsConnection {
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        log::info!("Closed WebSocket connection for job {}", self.job_id);
+        log::info!("Cleaned up WebSocket connection for job {}", self.job_id);
     }
 }
 
