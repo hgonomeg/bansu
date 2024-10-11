@@ -167,11 +167,6 @@ impl Actor for WsConnection {
                 }
                 .into_actor(self),
             );
-            // log::debug!("Sending a JobData message to indicate that the job is queued.");
-            // ctx.notify(JobData {
-            //     status: JobStatus::Queued,
-            //     job_output: None,
-            // });
             ctx.add_stream(futures_util::stream::once(async {
                 PeriodicUpdateTrigger {}
             }));
