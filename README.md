@@ -193,12 +193,14 @@ The kanji for "nest" is "巣".
 
 Combined together gives us:
 
+<span style="font-size: 200%">
 <ruby>
 <rb>鷭</rb>
 <rt>ban</rt>
 <rb>巣</rb>
 <rt>su</rt>
 </ruby>
+</span>
 
 
 [^1]: Note: A Japanese person will likely not recognize this character. It's rarely used.
