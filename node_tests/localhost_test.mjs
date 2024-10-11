@@ -32,8 +32,9 @@ function get_cif(job_id) {
     });
   
     res.on('end', () => {
-      console.log('CIF downloaded: ');
-      console.log(Buffer.concat(data).toString());
+      //console.log('CIF downloaded: ');
+      let cif_file_string = Buffer.concat(data).toString();
+      console.log('CIF file length: ', cif_file_string.length);
       process.exit(0);
     });
   }).on('error', err => {
