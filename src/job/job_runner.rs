@@ -103,8 +103,7 @@ impl Handler<InitializeQueuedJob> for JobRunner {
                         timeout_val,
                         msg.0,
                     );
-                    let fut = actix::fut::wrap_future(worker);
-                    ctx.spawn(fut);
+                    actix_rt::spawn(worker);
                 }
                 Err(e) => {
                     log::warn!(
@@ -255,8 +254,7 @@ impl JobRunner {
         Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {
             let worker =
                 JobRunner::worker(jhandle, ctx.address(), id, timeout_val, semaphore_permit);
-            let fut = actix::fut::wrap_future(worker);
-            ctx.spawn(fut);
+            actix_rt::spawn(worker);
             ret
         }))
     }

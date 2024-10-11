@@ -248,7 +248,7 @@ impl Handler<LookupJob> for JobManager {
 impl Handler<MonitorQueuedJob> for JobManager {
     type Result = <MonitorQueuedJob as actix::Message>::Result;
 
-    fn handle(&mut self, msg: MonitorQueuedJob, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: MonitorQueuedJob, _ctx: &mut Self::Context) -> Self::Result {
         if let Some(q_job) = self
             .job_queue
             .as_mut()
@@ -259,19 +259,16 @@ impl Handler<MonitorQueuedJob> for JobManager {
         } else {
             if let Some(job) = self.jobs.get(&msg.0).cloned() {
                 let id = msg.0;
-                ctx.spawn(
-                    async move {
-                        log::debug!(
-                            "Immediately notifying WsConnection about job being unqueued (ID={}).",
-                            id
-                        );
-                        if let Err(e) = msg.1.send(SetRunner(job)).await {
-                            log::warn!("WsConnection could not be notified about job being unqueued (ID={}): {}.",
+                actix_rt::spawn(async move {
+                    log::debug!(
+                        "Immediately notifying WsConnection about job being unqueued (ID={}).",
+                        id
+                    );
+                    if let Err(e) = msg.1.send(SetRunner(job)).await {
+                        log::warn!("WsConnection could not be notified about job being unqueued (ID={}): {}.",
                             &id, e);
-                        }
                     }
-                    .into_actor(self),
-                );
+                });
             } else {
                 // This should never happen
                 log::error!("Monitoring of queued job requested but the job is neither in queue nor in the jobs map (ID={})", msg.0);
