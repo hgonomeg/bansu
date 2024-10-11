@@ -48,7 +48,7 @@ impl Handler<SetRunner> for WsConnection {
         if self.job.is_some() {
             log::error!("WsConnection already has JobRunner set!");
         } else {
-            log::info!("Received JobRunner.");
+            log::debug!("Received JobRunner.");
             self.job = Some(msg.0.clone());
             self.job_addr_handshake(msg.0, ctx);
         }

@@ -157,7 +157,7 @@ impl JobManager {
         // In the worst-case scenario, it should have timed-out a long time ago.
         ctx.notify_later(RemoveJob(id.clone()), tm * 2);
 
-        log::info!("Job with ID={} moved from queue", id);
+        log::debug!("Job with ID={} moved from queue", id);
         runner
     }
     fn enqueue_job(

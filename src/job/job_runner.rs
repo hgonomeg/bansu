@@ -86,13 +86,13 @@ impl Handler<InitializeQueuedJob> for JobRunner {
         let id = self.id.clone();
         let jo = self.job_object.clone();
         let fut = actix::fut::wrap_future::<_, Self>(async move {
-            log::info!("Initializing queued job");
+            log::debug!("Initializing queued job");
             Self::try_init(&id, &jo).await
         })
         .map(|res, actor, ctx| {
             match res {
                 Ok((workdir, jhandle)) => {
-                    log::info!("Queued job initialized successfully (ID={})!", &actor.id);
+                    log::debug!("Queued job initialized successfully (ID={})!", &actor.id);
                     actor.workdir = Some(workdir);
                     actor.data.status = JobStatus::Pending;
                     let timeout_val = actor.job_object.timeout_value();
