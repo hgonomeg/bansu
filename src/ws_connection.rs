@@ -40,7 +40,7 @@ impl WsConnection {
         msg: WsJobDataUpdate,
         ctx: &mut <Self as actix::Actor>::Context,
     ) {
-        log::info!("Sending JobDataUpdate for job {}", self.job_id);
+        log::debug!("Sending JobDataUpdate for job {}", self.job_id);
         ctx.text(serde_json::to_string(&msg).unwrap());
         match msg.status {
             JobStatusInfo::Finished => {
@@ -153,11 +153,11 @@ impl Actor for WsConnection {
                 }
                 .into_actor(self),
             );
-            log::debug!("Sending a JobData message to indicate that the job is queued.");
-            ctx.notify(JobData {
-                status: JobStatus::Queued,
-                job_output: None,
-            });
+            // log::debug!("Sending a JobData message to indicate that the job is queued.");
+            // ctx.notify(JobData {
+            //     status: JobStatus::Queued,
+            //     job_output: None,
+            // });
         }
 
         let sleep_dur = std::time::Duration::from_secs(
