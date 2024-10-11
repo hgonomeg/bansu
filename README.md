@@ -115,6 +115,8 @@ Progress reports have the following JSON format:
     },
     /// Can be not-null only if the job failed.
     /// Currently, this only has value for `SetupError` failure reason
+    "error_message": "Some error message",
+    /// Only not-null if the job failed
     "failure_reason": "TimedOut | JobProcessError | SetupError"
 }
 
