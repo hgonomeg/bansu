@@ -50,7 +50,7 @@ function open_ws_connection(data) {
   try {
     const jsonData = JSON.parse(data);
     console.log("Got json: ", jsonData);
-    if(jsonData.job_id === null) {
+    if(jsonData.job_id == null || jsonData.job_id == undefined) {
       console.error("Server returned null job id. Error message is: ", jsonData.error_message);
       console.log("Exiting");
       process.exit(4);
