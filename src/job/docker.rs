@@ -56,9 +56,7 @@ impl ContainerHandle {
             working_dir: Some(local_working_dir),
             attach_stdout: Some(true),
             attach_stderr: Some(true),
-            // We are probably gonna run as root anyway.
-            // Running as non-root currently causes permission issues
-            // while deleting temporary files
+            // User shall be configured in the Dockerfile, not here
             // user: Some("bansu"),
             host_config: mount_bind.map(|(src, dst)| HostConfig {
                 mounts: Some(vec![Mount {
@@ -166,7 +164,7 @@ impl ContainerHandle {
                     exit_info = Some(ei);
                 }
                 // This uglyness prevents misinterpreting the failure of processes
-                // running in Docker as failure or the waiting procedure itself
+                // running in Docker as failure of the waiting procedure itself
                 Err(bollard::errors::Error::DockerContainerWaitError { error, code }) => {
                     // log::warn!("Error {:#?}", e);
                     exit_info = Some(ContainerWaitResponse {
@@ -215,6 +213,7 @@ impl Drop for ContainerHandle {
             if let Err(e) = d.stop_container(&id, None).await {
                 log::warn!("Could not stop container {}: {}.", &id, e);
             }
+            actix_rt::task::yield_now().await;
             if let Err(e) = d.remove_container(&id, None).await {
                 log::error!(
                     "Could not remove container {}: {}. No further attempts will be made.",

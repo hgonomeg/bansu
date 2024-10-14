@@ -22,10 +22,14 @@ impl Job for AcedrgJob {
     }
 
     fn timeout_value(&self) -> Duration {
-        if let Some(Ok(tm)) = env::var("BANSU_ACEDRG_TIMEOUT")
-            .ok()
-            .map(|tm| tm.parse::<u64>())
-        {
+        if let Some(Ok(tm)) = env::var("BANSU_ACEDRG_TIMEOUT").ok().map(|tm| {
+            tm.parse::<u64>().inspect_err(|e| {
+                log::error!(
+                    "Acedrg timeout could not be parsed: {}. Default value will be used.",
+                    e
+                )
+            })
+        }) {
             Duration::from_secs(tm)
         } else {
             Duration::from_secs(2 * 60)
