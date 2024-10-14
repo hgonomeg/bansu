@@ -1,6 +1,6 @@
 [package]
 name = "bansu"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Jakub Smulski <hgonomeg@gmail.com>"]
 edition = "2021"
 license = "GNU GPLv3"
