@@ -223,6 +223,7 @@ Combined together gives us:
 
 ## Todo
 
+* Auto-generate Swagger file (likely using utoipa)
 * Update job output in realtime
 * Support for servalcat
 * Think about API design for defining graph-like pipelines (if we ever need that)
