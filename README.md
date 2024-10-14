@@ -170,6 +170,7 @@ If you do not want to make use of Docker support, make sure that `acedrg` and `s
 ### Docker container setup
 
 A `Dockerfile` is included to build a suitable Docker container image.
+The image is based on Fedora but can be used on any distribution.
 
 In order to build it:
 
@@ -177,7 +178,11 @@ In order to build it:
 2. Run `docker build --pull --network host -t <name_of_your_image> -f FedoraDockerfile .`
 3. Wait for the image to be built.
 
-The image is based on Fedora but can be used on any distribution.
+#### Docker UID & permissions
+
+**Note:** By default, job artifacts will be owned by the user with **UID=1000**
+If this is not what you want, edit the `Dockerfile` and change the UID of the `bansu_container` user!
+(Defined by: `RUN useradd bansu_container -u 1000 -m -s /bin/bash`)
 
 ### Testing / Usage example
 
