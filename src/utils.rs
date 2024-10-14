@@ -11,44 +11,44 @@ use uuid::Uuid;
 
 use crate::job::docker::{ContainerHandle, ContainerHandleOutput};
 
-async fn docker_permission_issue_workaround(image_name: &str, path: PathBuf) {
-    let impl_ = async {
-        let path_str = path
-            .as_os_str()
-            .to_str()
-            .ok_or_else(|| anyhow::anyhow!("Could not convert path to UTF-8"))?;
-        let handle = ContainerHandle::new(
-            image_name,
-            vec!["rm", "-rfv", &path_str],
-            "/tmp",
-            Some((&path_str, &path_str)),
-        )
-        .await
-        .with_context(|| anyhow::anyhow!("Could not spawn container"))?;
-        actix_rt::task::yield_now().await;
-        let _output = handle.run().await?;
-        actix_rt::task::yield_now().await;
-        drop(handle);
-        actix_rt::task::yield_now().await;
-        // Makes no sense
-        // if output.exit_info.status_code != 0 {
-        //     anyhow::bail!("Docker container could not properly execute command: {:?}", output);
-        // } else {
-        //     println!("dbg: {:?}", output);
-        // }
-        // Now we can re-try to delete the folder itself
-        fs::remove_dir_all(&path).await?;
-        anyhow::Ok(())
-    };
-    match impl_.await {
-        Ok(()) => {
-            log::debug!("Docker permission misconfiguration workaround success");
-        }
-        Err(e) => {
-            log::error!("Docker permission misconfiguration workaround failed: {}. Temporary directory \"{}\" could not be removed", e, path.display());
-        }
-    }
-}
+// async fn docker_permission_issue_workaround(image_name: &str, path: PathBuf) {
+//     let impl_ = async {
+//         let path_str = path
+//             .as_os_str()
+//             .to_str()
+//             .ok_or_else(|| anyhow::anyhow!("Could not convert path to UTF-8"))?;
+//         let handle = ContainerHandle::new(
+//             image_name,
+//             vec!["rm", "-rfv", &path_str],
+//             "/tmp",
+//             Some((&path_str, &path_str)),
+//         )
+//         .await
+//         .with_context(|| anyhow::anyhow!("Could not spawn container"))?;
+//         actix_rt::task::yield_now().await;
+//         let _output = handle.run().await?;
+//         actix_rt::task::yield_now().await;
+//         drop(handle);
+//         actix_rt::task::yield_now().await;
+//         // Makes no sense
+//         // if output.exit_info.status_code != 0 {
+//         //     anyhow::bail!("Docker container could not properly execute command: {:?}", output);
+//         // } else {
+//         //     println!("dbg: {:?}", output);
+//         // }
+//         // Now we can re-try to delete the folder itself
+//         fs::remove_dir_all(&path).await?;
+//         anyhow::Ok(())
+//     };
+//     match impl_.await {
+//         Ok(()) => {
+//             log::debug!("Docker permission misconfiguration workaround success");
+//         }
+//         Err(e) => {
+//             log::error!("Docker permission misconfiguration workaround failed: {}. Temporary directory \"{}\" could not be removed", e, path.display());
+//         }
+//     }
+// }
 
 pub struct WorkDir {
     pub path: PathBuf,
@@ -60,18 +60,18 @@ impl Drop for WorkDir {
         actix_rt::spawn(async move {
             log::debug!("Removing temporary directory {}", path.to_string_lossy());
             if let Err(e) = fs::remove_dir_all(&path).await {
-                if let Ok(image_name) = std::env::var("BANSU_DOCKER") {
-                    if e.kind() == std::io::ErrorKind::PermissionDenied {
-                        log::error!(
-                            "Could not remove temporary directory {} : {}. Your Docker image has misconfigured user and/or permissions,  \
-                            resulting in temporary directories not being able to be deleted. \
-                            Refer to Docker container setup documentation for the fix. A costly and ugly work-around will be employed right now", path.to_string_lossy(),
-                            e
-                        );
-                        actix_rt::task::yield_now().await;
-                        return docker_permission_issue_workaround(&image_name, path).await;
-                    }
-                }
+                // if let Ok(image_name) = std::env::var("BANSU_DOCKER") {
+                //     if e.kind() == std::io::ErrorKind::PermissionDenied {
+                //         log::error!(
+                //             "Could not remove temporary directory {} : {}. Your Docker image has misconfigured user and/or permissions,  \
+                //             resulting in temporary directories not being able to be deleted. \
+                //             Refer to Docker container setup documentation for the fix. A costly and ugly work-around will be employed right now", path.to_string_lossy(),
+                //             e
+                //         );
+                //         actix_rt::task::yield_now().await;
+                //         return docker_permission_issue_workaround(&image_name, path).await;
+                //     }
+                // }
                 log::warn!(
                     "Could not remove temporary directory {} : {}",
                     path.to_string_lossy(),
