@@ -1,15 +1,16 @@
 [package]
 name = "bansu"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 authors = ["Jakub Smulski <hgonomeg@gmail.com>"]
 edition = "2021"
 license = "GNU GPLv3"
 
 [dependencies]
 actix = "0.13"
+actix-governor = "0.6"
 actix-rt = "2"
 actix-web = "4"
-actix-web-actors = "4"
+actix-ws = "0.3"
 anyhow = "1"
 bollard = { version = "0.17", features = ["tokio-stream"] }
 # bytes = "1"

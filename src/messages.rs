@@ -8,6 +8,7 @@ pub enum JobStatusInfo {
     Pending,
     Finished,
     Failed,
+    Queued,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
@@ -33,6 +34,7 @@ impl From<JobStatus> for JobStatusInfo {
             JobStatus::Pending => JobStatusInfo::Pending,
             JobStatus::Finished => JobStatusInfo::Finished,
             JobStatus::Failed(_) => JobStatusInfo::Failed,
+            JobStatus::Queued => JobStatusInfo::Queued,
         }
     }
 }
@@ -40,8 +42,26 @@ impl From<JobStatus> for JobStatusInfo {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WsJobDataUpdate {
     pub status: JobStatusInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub job_output: Option<JobOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub failure_reason: Option<JobFailureInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_position: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+}
+
+impl WsJobDataUpdate {
+    pub fn new_from_queue_pos(queue_pos: usize) -> Self {
+        Self {
+            status: JobStatusInfo::Queued,
+            job_output: None,
+            failure_reason: None,
+            queue_position: Some(queue_pos),
+            error_message: None,
+        }
+    }
 }
 
 impl From<crate::job::JobData> for WsJobDataUpdate {
@@ -53,8 +73,17 @@ impl From<crate::job::JobData> for WsJobDataUpdate {
                     _ => None,
                 }
             },
+            error_message: match &value.status {
+                JobStatus::Failed(f) => match f {
+                    JobFailureReason::TimedOut => None,
+                    JobFailureReason::SetupError(e) => Some(e.to_owned()),
+                    JobFailureReason::JobProcessError => None,
+                },
+                _ => None,
+            },
             status: JobStatusInfo::from(value.status),
             job_output: value.job_output,
+            queue_position: None,
         }
     }
 }
@@ -82,8 +111,12 @@ pub struct GenericErrorMessage {
 
 #[derive(Deserialize, Serialize)]
 pub struct JobSpawnReply {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub job_id: Option<JobId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_position: Option<usize>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

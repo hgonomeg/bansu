@@ -6,8 +6,8 @@ do_wget() {
 
 LIBEIGEN_VER=3.4.0
 RDKIT_VER=2024_09_1
-GEMMI_VER=0.6.6
-SERVALCAT_VER=0.4.77
+GEMMI_VER=0.6.7
+SERVALCAT_VER=0.4.88
 # ACEDRG_VER=main
 ACEDRG_VER=bzr
 
@@ -21,7 +21,7 @@ download_all() {
     # Acedrg
     # do_wget https://ccp4forge.rc-harwell.ac.uk/ccp4/acedrg/-/archive/main/acedrg-${ACEDRG_VER}.tar.gz &&\
     # tar -xf acedrg-${ACEDRG_VER}.tar.gz
-    echo Checking-out acedrg with breezy...
+    echo Checking-out acedrg with breezy \(be patient, this may take a long time\)...
     brz checkout https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/ acedrg-${ACEDRG_VER} || exit 7
 
 

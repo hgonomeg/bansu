@@ -16,3 +16,6 @@ COPY wrappers/ccp4-python /usr/bin/ccp4-python
 COPY wrappers/servalcat /usr/bin/servalcat
 COPY setup_bansu_fedora_image.sh /setup_bansu_fedora_image.sh
 RUN source /setup_bansu_fedora_image.sh && setup_all
+# Change -u 1000 to match your desired host UID in your setup
+RUN useradd bansu_container -u 1000 -m -s /bin/bash
+USER bansu_container

@@ -15,6 +15,8 @@ pub mod servalcat;
 pub enum JobSpawnError {
     #[error("Input validation failed: {0}")]
     InputValidation(String),
+    #[error("Too many jobs")]
+    TooManyJobs,
     #[error("{0:#}")]
     Other(#[from] anyhow::Error),
 }
