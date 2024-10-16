@@ -248,14 +248,14 @@ async fn main() -> anyhow::Result<()> {
             .map(|port_str| port_str.parse::<u32>())
             .transpose()
             .with_context(|| "Could not parse rate-limiter burst size")?
-            .unwrap_or(10);
+            .unwrap_or(45);
 
         let sec_per_rq = env::var("BANSU_RATELIMIT_SECONDS_PER_REQUEST")
             .ok()
             .map(|port_str| port_str.parse::<u64>())
             .transpose()
             .with_context(|| "Could not parse rate-limiter seconds per request")?
-            .unwrap_or(15);
+            .unwrap_or(10);
 
         log::info!(
             "Rate-limiter configuration: burst_size={} seconds_per_request={}",
