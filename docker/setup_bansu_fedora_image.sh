@@ -5,7 +5,6 @@ do_wget() {
 }
 
 LIBEIGEN_VER=3.4.0
-# Not released yet, but needed for Python 3.13
 RDKIT_VER=2024_09_1
 GEMMI_VER=0.6.6
 SERVALCAT_VER=0.4.77
