@@ -230,6 +230,7 @@ Combined together gives us:
 
 * Auto-generate Swagger file (likely using utoipa)
 * Update job output in realtime
+* HTTP base URL support
 * Some kind of request logging for statistics
 * Some way of achieving interactivity (admin console?)
 * Graceful shutdown (finishing current jobs + what's already in the queue)
