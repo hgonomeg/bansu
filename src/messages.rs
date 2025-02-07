@@ -1,5 +1,6 @@
 use crate::job::{JobFailureReason, JobOutput, JobStatus};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 pub type JobId = String;
 
@@ -120,6 +121,7 @@ pub struct JobSpawnReply {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(ToSchema)]
 pub struct AcedrgArgs {
     pub smiles: String,
     pub commandline_args: Vec<String>,
