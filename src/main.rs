@@ -24,6 +24,14 @@ use tokio::io::AsyncReadExt;
 use ws_connection::WsConnection;
 // use log::{info,warn,error,debug};
 
+#[utoipa::path(
+    responses(
+        (status = 200, description = "Ok")
+    ),
+    params(
+        ("job_id", description = "Job ID")
+    )
+)]
 #[get("/get_cif/{job_id}")]
 async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>>) -> HttpResponse {
     let job_id = path.into_inner();
