@@ -345,6 +345,7 @@ async fn main() -> anyhow::Result<()> {
             .service(get_cif)
             .service(job_ws)
             .service(
+                // Do we want/need this scope?
                 web::scope("/api-docs")
                     .app_data(Data::new(apidoc.clone()))
                     .route("/openapi.json", web::get().to(apidoc_json))
