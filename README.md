@@ -237,3 +237,4 @@ Combined together gives us:
 * Maintaining a database of docker containers + temporary directories (for automatic cleanup after dirty shutdown)
 * Support for servalcat
 * Think about API design for defining graph-like pipelines (if we ever need that)
+* Add api versioning (`/v1`, `/v2`) - when we need it
