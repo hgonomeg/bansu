@@ -48,6 +48,7 @@ The following environment variables control the behavior of the server:
 * `RUST_LOG` - sets the log level (like with most Rust programs)
 * `BANSU_PORT` - sets the port to listen on (`8080` by default)
 * `BANSU_ADDRESS` - sets the address to listen on (`127.0.0.1` by default)
+* `BANSU_BASE_URL` - sets the base HTTP path, e.g. (`/bansu`)
 * `BANSU_DOCKER` - enables Docker support and sets the name of the Docker image used for running jobs. If this variable is set, the server will refuse to run if the Docker configuration is invalid
 * `BANSU_DISALLOW_DOCKERLESS` - can be set to cause Bansu to refuse to run without Docker support
 * `BANSU_PERIODIC_WS_UPDATE_INTERVAL` - specifies the interval at which web socket connections send periodic status updates (in seconds; `16` by default)
@@ -230,7 +231,6 @@ Combined together gives us:
 
 * Auto-generate Swagger file (likely using utoipa)
 * Update job output in realtime
-* HTTP base URL support
 * Some kind of request logging for statistics
 * Some way of achieving interactivity (admin console?)
 * Graceful shutdown (finishing current jobs + what's already in the queue)

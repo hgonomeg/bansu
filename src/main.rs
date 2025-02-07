@@ -331,7 +331,34 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let apidoc = ApiDoc::openapi();
+    fn configure_base_url(cfg: &mut actix_web::web::ServiceConfig) {
+        fn configure_content(
+            cfg: &mut actix_web::web::ServiceConfig,
+            apidoc: utoipa::openapi::OpenApi,
+        ) {
+            cfg.service(run_acedrg)
+                .service(get_cif)
+                .service(job_ws)
+                .service(
+                    // Do we want/need this scope?
+                    web::scope("/api-docs")
+                        .app_data(Data::new(apidoc.clone()))
+                        .route("/openapi.json", web::get().to(apidoc_json))
+                        .route("/openapi.yaml", web::get().to(apidoc_yaml)),
+                );
+        }
+
+        let apidoc = ApiDoc::openapi();
+        match env::var("BANSU_BASE_URL") {
+            Ok(base_url) => {
+                // log::info!("Enabling base url: {}", &base_url);
+                cfg.service(web::scope(&base_url).configure(|cfg| configure_content(cfg, apidoc)));
+            }
+            Err(_) => {
+                cfg.configure(|cfg| configure_content(cfg, apidoc));
+            }
+        }
+    }
 
     log::info!("Initializing HTTP server...");
     Ok(HttpServer::new(move || {
@@ -341,16 +368,7 @@ async fn main() -> anyhow::Result<()> {
                 Governor::new(&governor_conf),
             ))
             .app_data(Data::new(job_manager.clone()))
-            .service(run_acedrg)
-            .service(get_cif)
-            .service(job_ws)
-            .service(
-                // Do we want/need this scope?
-                web::scope("/api-docs")
-                    .app_data(Data::new(apidoc.clone()))
-                    .route("/openapi.json", web::get().to(apidoc_json))
-                    .route("/openapi.yaml", web::get().to(apidoc_yaml)),
-            )
+            .configure(configure_base_url)
     })
     .bind((addr, port))?
     .run()
