@@ -1,4 +1,4 @@
-FROM fedora:40
+FROM fedora:41
 RUN dnf update -y
 RUN mkdir -p /download
 RUN mkdir -p /build
@@ -8,8 +8,9 @@ RUN dnf install -y boost boost-devel cmake
 RUN dnf install -y make bison flex
 RUN dnf install -y fftw2-devel fftw-devel
 RUN dnf install -y helix vim fd-find ag
-# The version shipped with Fedora is broken
-RUN pip install breezy
+# The version shipped with Fedora is no longer broken
+# RUN pip install breezy
+RUN dnf install -y breezy
 RUN cd /usr/share && git clone https://github.com/MonomerLibrary/monomers
 COPY wrappers/ccp4-python /usr/bin/ccp4-python
 COPY wrappers/servalcat /usr/bin/servalcat
