@@ -110,7 +110,7 @@ pub struct GenericErrorMessage {
     pub error_message: Option<String>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone, Debug, ToSchema)]
 pub struct JobSpawnReply {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub job_id: Option<JobId>,

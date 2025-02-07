@@ -146,7 +146,7 @@ async fn job_ws(
 #[utoipa::path(
     responses(
         // todo: fix this
-        (status = 200, description = "Ok")
+        (status = 200, description = "Ok", body = JobSpawnReply)
     ),
     // todo: payload
     // params(
