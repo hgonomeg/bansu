@@ -120,8 +120,7 @@ pub struct JobSpawnReply {
     pub queue_position: Option<usize>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[derive(ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct AcedrgArgs {
     pub smiles: String,
     pub commandline_args: Vec<String>,

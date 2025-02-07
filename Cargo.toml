@@ -25,7 +25,8 @@ thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "libc", "net", "time", "process", "signal", "rt-multi-thread", "sync", "macros"] }
 tokio-stream = { version = "0.1", features = ["time", "fs", "io-util", "net", "signal", "sync"] }
 utoipa = { version = "5", features = ["actix_extras", "yaml"] }
-utoipa-actix-web = "0.1"
-# Can I serve .yaml / .json without an UI?
-utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
+# I prefer to serve raw .json and .yaml
+# and not include the whole UI in my app, as it explodes the executable size
+# utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
+# utoipa-actix-web = "0.1"
 uuid = { version = "1", features = ["v4", "fast-rng", "serde"] }

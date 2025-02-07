@@ -8,9 +8,8 @@ use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_ws::handle as ws_handle;
-use utoipa::OpenApi;
-use utoipa_actix_web::AppExt;
 use std::{env, sync::Arc};
+use utoipa::OpenApi;
 pub mod job;
 use anyhow::Context;
 use job::{
@@ -29,7 +28,8 @@ use ws_connection::WsConnection;
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "Bansu", description = "Server-side computation API for Moorhen"
+        title = "Bansu",
+        description = "Server-side computation API for Moorhen"
     ),
     paths(get_cif, run_acedrg, job_ws)
 )]
@@ -316,16 +316,22 @@ async fn main() -> anyhow::Result<()> {
             .unwrap()
     };
 
-    // let openapi_srv = |api: utoipa::openapi::OpenApi| {
+    async fn apidoc_json(api: Data<utoipa::openapi::OpenApi>) -> HttpResponse {
+        HttpResponse::Ok().json(api)
+    }
 
-    //     fn api_to_response(api: utoipa::openapi::OpenApi) -> HttpResponse {
-    //         HttpResponse::Ok().body(api.to_yaml().unwrap())
-    //     }
+    async fn apidoc_yaml(api: Data<utoipa::openapi::OpenApi>) -> HttpResponse {
+        match api.as_ref().to_yaml() {
+            Ok(yaml) => HttpResponse::Ok().body(yaml),
+            Err(e) => {
+                let err_msg = format!("{}", e);
+                log::error!("/api-docs/openapi.yaml - {}", err_msg);
+                HttpResponse::InternalServerError().body(format!("{}", err_msg))
+            }
+        }
+    }
 
-    //     web::resource("api-docs/openapi.yaml").route(web::get().app_data().to(|| {
-    //         api_to_yaml(api.clone())
-    //     }))
-    // };
+    let apidoc = ApiDoc::openapi();
 
     log::info!("Initializing HTTP server...");
     Ok(HttpServer::new(move || {
@@ -334,17 +340,16 @@ async fn main() -> anyhow::Result<()> {
                 env::var("BANSU_DISABLE_RATELIMIT").is_err(),
                 Governor::new(&governor_conf),
             ))
-            .into_utoipa_app()
-            // .openapi_service(openapi_srv)
             .app_data(Data::new(job_manager.clone()))
             .service(run_acedrg)
             .service(get_cif)
             .service(job_ws)
-            .openapi(ApiDoc::openapi())
-            .openapi_service(|api|
-                utoipa_swagger_ui::SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api)
+            .service(
+                web::scope("/api-docs")
+                    .app_data(Data::new(apidoc.clone()))
+                    .route("/openapi.json", web::get().to(apidoc_json))
+                    .route("/openapi.yaml", web::get().to(apidoc_yaml)),
             )
-            .into_app()
     })
     .bind((addr, port))?
     .run()
