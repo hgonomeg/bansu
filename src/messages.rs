@@ -1,5 +1,6 @@
 use crate::job::{JobFailureReason, JobOutput, JobStatus};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
 pub type JobId = String;

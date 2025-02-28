@@ -10,6 +10,7 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+#[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 pub mod docker;
 pub mod job_handle;
