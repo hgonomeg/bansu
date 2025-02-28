@@ -368,7 +368,7 @@ async fn main() -> anyhow::Result<()> {
                 .service(get_cif)
                 .service(job_ws);
             if ! env::var("BANSU_DISABLE_APIDOC").is_ok() {
-                log::info!("Enabling OpenAPI documentation.");
+                // log::info!("Enabling OpenAPI documentation.");
                 cfg.service(
                     // Do we want/need this scope?
                     web::scope("/api-docs")
@@ -377,7 +377,7 @@ async fn main() -> anyhow::Result<()> {
                         .route("/openapi.yaml", web::get().to(apidoc_yaml)),
                 );
             } else {
-                log::info!("OpenAPI documentation disabled.");
+                // log::info!("OpenAPI documentation disabled.");
             }
         }
 
