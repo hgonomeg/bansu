@@ -9,6 +9,7 @@ use actix_web::{
 };
 use actix_ws::handle as ws_handle;
 use std::{env, sync::Arc};
+#[cfg(feature = "utoipa")]
 use utoipa::OpenApi;
 pub mod job;
 use anyhow::Context;

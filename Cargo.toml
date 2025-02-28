@@ -5,6 +5,10 @@ authors = ["Jakub Smulski <hgonomeg@gmail.com>"]
 edition = "2021"
 license = "GNU GPLv3"
 
+[features]
+default = ["utoipa"]
+utoipa = ["dep:utoipa"]
+
 [dependencies]
 actix = "0.13"
 actix-governor = "0.6"
@@ -24,7 +28,7 @@ thiserror = "1"
 # tempfile = "3.10.1"
 tokio = { version = "1", features = ["fs", "io-util", "libc", "net", "time", "process", "signal", "rt-multi-thread", "sync", "macros"] }
 tokio-stream = { version = "0.1", features = ["time", "fs", "io-util", "net", "signal", "sync"] }
-utoipa = { version = "5", features = ["actix_extras", "yaml"] }
+utoipa = { version = "5", features = ["actix_extras", "yaml"] , optional = true }
 # I prefer to serve raw .json and .yaml
 # and not include the whole UI in my app, as it explodes the executable size
 # utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
