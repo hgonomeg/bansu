@@ -10,12 +10,13 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use utoipa::ToSchema;
 pub mod docker;
 pub mod job_handle;
 pub mod job_runner;
 pub mod job_type;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct JobOutput {
     pub stdout: String,
     pub stderr: String,

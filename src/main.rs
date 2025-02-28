@@ -113,10 +113,30 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
 }
 
 #[utoipa::path(
+    description = r#"Opens a WebSocket connection which allows you to track the job's progress.
+Progress messages are sent in the following scenarios:
+
+* When the connection gets established
+* When the job status / `job_output` get updated
+* Periodically, with interval specified in server configuration (useful for estimating how long it may take for a queued job to be processed)
+
+Connection gets automatically closed if the job fails or completes.
+
+For queued jobs which could not have been started, listening on a WebSocket also lets you know why it failed (including input validation failure and all oher errors).
+
+The connection ignores all messages sent to it (responds only to Ping messages).
+"#,
     responses(
-        // todo: fix this
-        (status = 200, description = "Ok")
+        (status = 101, description = "Opens up WebSocket connection", 
+            headers(
+                ("Connection" = String, description = "Upgrade"), 
+                ("Upgrade" = String, description = "websocket")
+            )
+        ),
+        (status = 404, description = "The given `job_id` is not valid")
+
     ),
+    request_body(content = WsJobDataUpdate, description = "This is the format of progress reports sent through the WebSocket."),
     params(
         ("job_id", description = "Job ID")
     )

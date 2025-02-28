@@ -4,7 +4,7 @@ use utoipa::ToSchema;
 
 pub type JobId = String;
 
-#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, ToSchema)]
 pub enum JobStatusInfo {
     Pending,
     Finished,
@@ -12,7 +12,7 @@ pub enum JobStatusInfo {
     Queued,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, ToSchema)]
 pub enum JobFailureInfo {
     TimedOut,
     JobProcessError,
@@ -40,16 +40,31 @@ impl From<JobStatus> for JobStatusInfo {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[schema(example = json!({
+    "status": "Pending | Finished | Failed | Queued",
+    "queue_position": "number | null",
+    "job_output": {
+        "stdout": "A string",
+        "stderr": "A string"
+    },
+    "error_message": "Some error message",
+    "failure_reason": "TimedOut | JobProcessError | SetupError"
+}))]
 pub struct WsJobDataUpdate {
+    /// Job status
     pub status: JobStatusInfo,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Will be null if the job is still pending, if it timed-out or the child process failed due to an I/O error
     pub job_output: Option<JobOutput>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Only not-null if the job failed
     pub failure_reason: Option<JobFailureInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Only not-null if the job is queued
     pub queue_position: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Can be not-null only if the job failed. Currently, this only has value for `SetupError` failure reason
     pub error_message: Option<String>,
 }
 
