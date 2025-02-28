@@ -28,5 +28,6 @@ utoipa = { version = "5", features = ["actix_extras", "yaml"] }
 # I prefer to serve raw .json and .yaml
 # and not include the whole UI in my app, as it explodes the executable size
 # utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
+# We are not using that. Adds complexity.
 # utoipa-actix-web = "0.1"
 uuid = { version = "1", features = ["v4", "fast-rng", "serde"] }
