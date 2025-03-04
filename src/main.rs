@@ -26,6 +26,7 @@ use tokio::io::AsyncReadExt;
 use ws_connection::WsConnection;
 // use log::{info,warn,error,debug};
 
+#[cfg(feature = "utoipa")]
 #[derive(OpenApi)]
 #[openapi(
     info(
