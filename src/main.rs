@@ -254,7 +254,10 @@ async fn main() -> anyhow::Result<()> {
         log::info!("Testing Docker configuration...");
         if let Err(e) = utils::test_docker(&docker_image_name).await {
             log::error!("Docker test failed - {:#}. Disabling Docker support.", e);
-            env::remove_var("BANSU_DOCKER");
+            // todo: Do not depend on setenv / getenv while spawning jobs
+            unsafe {
+                env::remove_var("BANSU_DOCKER");
+            }
         } else {
             log::info!("Docker test successful.");
         }
