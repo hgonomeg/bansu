@@ -5,7 +5,8 @@ use utoipa::ToSchema;
 
 pub type JobId = String;
 
-#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, ToSchema)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 pub enum JobStatusInfo {
     Pending,
     Finished,
@@ -13,7 +14,8 @@ pub enum JobStatusInfo {
     Queued,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, ToSchema)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 pub enum JobFailureInfo {
     TimedOut,
     JobProcessError,
@@ -41,8 +43,9 @@ impl From<JobStatus> for JobStatusInfo {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-#[schema(example = json!({
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", schema(example = json!({
     "status": "Pending | Finished | Failed | Queued",
     "queue_position": "number | null",
     "job_output": {
@@ -51,7 +54,7 @@ impl From<JobStatus> for JobStatusInfo {
     },
     "error_message": "Some error message",
     "failure_reason": "TimedOut | JobProcessError | SetupError"
-}))]
+})))]
 pub struct WsJobDataUpdate {
     /// Job status
     pub status: JobStatusInfo,
@@ -126,12 +129,13 @@ pub struct GenericErrorMessage {
     pub error_message: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, ToSchema)]
-#[schema(example = json!({
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", schema(example = json!({
     "job_id": "UUID of your job",
     "error_message": "Error message if the request failed",
     "queue_position": 12
-}))]
+})))]
 pub struct JobSpawnReply {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Null on error
@@ -144,11 +148,12 @@ pub struct JobSpawnReply {
     pub queue_position: Option<usize>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-#[schema(
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", schema(
     description = "Contains input SMILES string and an array of additional arguments passed to Acedrg.", 
     example = json!({"smiles": "Your SMILES string", "commandline_args": ["-z", "--something"]})
-)]
+))]
 pub struct AcedrgArgs {
     /// Input SMILES string
     pub smiles: String,
