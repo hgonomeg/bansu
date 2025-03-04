@@ -62,7 +62,7 @@ The following environment variables control the behavior of the server:
 
 ### API
 
-See API documentation [here](docs/redoc-static.html).
+See API documentation [here](API_DOCUMENTATION.md).
 The server exposes the following API:
 
 ### HTTP POST `/run_acedrg`
