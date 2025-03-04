@@ -346,6 +346,32 @@ async fn main() -> anyhow::Result<()> {
             .unwrap()
     };
 
+    #[derive(Clone, Default)]
+    struct ServerPathConfig {
+        #[cfg(feature = "utoipa")]
+        disable_apidoc: bool,
+        base_url: Option<String>,
+    }
+
+    let mut config = ServerPathConfig::default();
+
+    #[cfg(feature = "utoipa")]
+    if !env::var("BANSU_DISABLE_APIDOC").is_ok() {
+        log::info!("Enabling OpenAPI documentation.");
+    } else {
+        config.disable_apidoc = true;
+        log::info!("OpenAPI documentation disabled.");
+    }
+    #[cfg(not(feature = "utoipa"))]
+    log::info!("OpenAPI documentation disabled at compile-time.");
+
+    if let Ok(base_url) = env::var("BANSU_BASE_URL") {
+        log::info!("Enabling base url: {}", &base_url);
+        config.base_url = Some(base_url);
+    } else {
+        log::info!("No base url defined. Starting on global scope.");
+    }
+
     #[cfg(feature = "utoipa")]
     async fn apidoc_json(api: Data<utoipa::openapi::OpenApi>) -> HttpResponse {
         HttpResponse::Ok().json(api)
@@ -363,17 +389,16 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    fn configure_base_url(cfg: &mut actix_web::web::ServiceConfig) {
+    fn configure_paths(cfg: &mut actix_web::web::ServiceConfig, pcfg: ServerPathConfig) {
         fn configure_content(
             cfg: &mut actix_web::web::ServiceConfig,
-            #[cfg(feature = "utoipa")] apidoc: utoipa::openapi::OpenApi,
+            #[cfg(feature = "utoipa")] apidoc: Option<utoipa::openapi::OpenApi>,
             #[cfg(not(feature = "utoipa"))] _apidoc: (),
         ) {
             cfg.service(run_acedrg).service(get_cif).service(job_ws);
 
             #[cfg(feature = "utoipa")]
-            if !env::var("BANSU_DISABLE_APIDOC").is_ok() {
-                log::debug!("Enabling OpenAPI documentation.");
+            if let Some(apidoc) = apidoc {
                 cfg.service(
                     // Do we want/need this scope?
                     web::scope("/api-docs")
@@ -381,24 +406,23 @@ async fn main() -> anyhow::Result<()> {
                         .route("/openapi.json", web::get().to(apidoc_json))
                         .route("/openapi.yaml", web::get().to(apidoc_yaml)),
                 );
-            } else {
-                log::debug!("OpenAPI documentation disabled.");
             }
-            #[cfg(not(feature = "utoipa"))]
-            log::debug!("OpenAPI documentation disabled at compile-time.");
         }
 
         #[cfg(feature = "utoipa")]
-        let apidoc = ApiDoc::openapi();
+        let apidoc = if pcfg.disable_apidoc {
+            None
+        } else {
+            Some(ApiDoc::openapi())
+        };
         #[cfg(not(feature = "utoipa"))]
         let apidoc = ();
 
-        match env::var("BANSU_BASE_URL") {
-            Ok(base_url) => {
-                log::debug!("Enabling base url: {}", &base_url);
+        match pcfg.base_url {
+            Some(base_url) => {
                 cfg.service(web::scope(&base_url).configure(|cfg| configure_content(cfg, apidoc)));
             }
-            Err(_) => {
+            None => {
                 cfg.configure(|cfg| configure_content(cfg, apidoc));
             }
         }
@@ -406,13 +430,14 @@ async fn main() -> anyhow::Result<()> {
 
     log::info!("Initializing HTTP server...");
     Ok(HttpServer::new(move || {
+        let pconfig = config.clone();
         App::new()
             .wrap(Condition::new(
                 env::var("BANSU_DISABLE_RATELIMIT").is_err(),
                 Governor::new(&governor_conf),
             ))
             .app_data(Data::new(job_manager.clone()))
-            .configure(configure_base_url)
+            .configure(|cfg: &mut actix_web::web::ServiceConfig| configure_paths(cfg, pconfig))
     })
     .bind((addr, port))?
     .run()
