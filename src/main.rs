@@ -234,7 +234,7 @@ async fn run_acedrg(
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     eprintln!(
-        "Bansu Server, v{} \n\nAuthors: {}\nLicense: {}\nCopyright (C) 2024, Global Phasing Ltd.",
+        "Bansu Server, v{} \n\nAuthors: {}\nLicense: {}\nCopyright (C) 2024 - 2025, Global Phasing Ltd.",
         env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_AUTHORS"),
         env!("CARGO_PKG_LICENSE")
