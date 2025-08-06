@@ -40,7 +40,7 @@ in Docker containers which is the recommended thing to do.
 Running jobs in a Docker container helps to isolate jobs from each other and the rest of the system.
 This greatly reduces the potential impact of a successful exploitation of any vulnerabilities present in Acedrg and Servalcat.
 
-### Configuration
+## Configuration
 
 The following environment variables control the behavior of the server:
 
@@ -60,7 +60,7 @@ The following environment variables control the behavior of the server:
 * `BANSU_DISABLE_RATELIMIT` - can be set to disable rate-limiting of requests. (For testing only)
 * `BANSU_DISABLE_APIDOC` - Disable json/yaml OpenAPI documentation at `/api-docs/openapi.json`
 
-### API
+## API
 
 See API documentation [here](API_DOCUMENTATION.md).
 The server exposes the following API:
