@@ -116,7 +116,7 @@ async fn job_ws(
 
 #[options("/run_acedrg")]
 // This is here due to CORS necessities
-async fn run_acedrg_preflight(req: HttpRequest) -> HttpResponse {
+async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
     // if let Some(val) = req.headers().get("Access-Control-Request-Method") {
     //     if val.to_str().unwrap_or("") != "POST" {
     //         HttpResponse::BadRequest()
