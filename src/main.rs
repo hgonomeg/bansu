@@ -116,10 +116,31 @@ async fn job_ws(
 
 #[options("/run_acedrg")]
 // This is here due to CORS necessities
-async fn run_acedrg_preflight() -> HttpResponse {
+async fn run_acedrg_preflight(req: HttpRequest) -> HttpResponse {
+    // if let Some(val) = req.headers().get("Access-Control-Request-Method") {
+    //     if val.to_str().unwrap_or("") != "POST" {
+    //         HttpResponse::BadRequest()
+    //     }
+    // }
+    // if let Some(val) = req.headers().get("Access-Control-Request-Headers") {
+    //     match val.to_str().unwrap_or("") {
+    //         "content-type" | "Content-Type" => {
+
+    //         }
+    //         _ => {
+
+    //         }
+    //     }
+    // }
     // Anything other than 404 is already nice
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods/OPTIONS#preflighted_requests_in_cors
     HttpResponse::Ok()
-        .insert_header(("Content-Type", "application/json"))
+        .insert_header(("Allow", "OPTIONS, POST"))
+        .insert_header(("Access-Control-Request-Headers", "content-type"))
+        // should also be set by nginx but let's put it here anyway
+        .insert_header(("Access-Control-Allow-Origin", "*"))
+        // The above permissions may be cached for 86,400 seconds (1 day)
+        .insert_header(("Access-Control-Max-Age", "86400"))
         .finish()
 }
 
