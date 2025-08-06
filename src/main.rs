@@ -3,7 +3,7 @@ use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{
     get,
     middleware::Condition,
-    /*http::StatusCode*/ post,
+    options, /*http::StatusCode*/ post,
     web::{self, Data},
     App, HttpRequest, HttpResponse, HttpServer,
 };
@@ -112,6 +112,13 @@ async fn job_ws(
     let (response, session, msg_stream) = ws_handle(&req, payload)?;
     WsConnection::new(jm, job_opt, job_id, session, msg_stream);
     Ok(response)
+}
+
+#[options("/run_acedrg")]
+// This is here due to CORS necessities
+async fn run_acedrg_preflight() -> HttpResponse {
+    // Anything other than 404 is already nice
+    HttpResponse::Ok().finish()
 }
 
 #[post("/run_acedrg")]
@@ -286,6 +293,7 @@ async fn main() -> anyhow::Result<()> {
             ))
             .app_data(Data::new(job_manager.clone()))
             .service(run_acedrg)
+            .service(run_acedrg_preflight)
             .service(get_cif)
             .service(job_ws)
     })
