@@ -138,13 +138,13 @@ pub struct GenericErrorMessage {
 })))]
 pub struct JobSpawnReply {
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Null on error
+    /// UUID of the spawned job. Null on error
     pub job_id: Option<JobId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Null on success
     pub error_message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Position counted from 0. Null if the job is being processed without a queue
+    /// Position counted from 0. Null if the job is being processed without a queue.
     pub queue_position: Option<usize>,
 }
 
