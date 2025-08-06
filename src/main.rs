@@ -118,7 +118,9 @@ async fn job_ws(
 // This is here due to CORS necessities
 async fn run_acedrg_preflight() -> HttpResponse {
     // Anything other than 404 is already nice
-    HttpResponse::Ok().finish()
+    HttpResponse::Ok()
+        .insert_header(("Content-Type", "application/json"))
+        .finish()
 }
 
 #[post("/run_acedrg")]
