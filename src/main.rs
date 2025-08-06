@@ -139,8 +139,8 @@ async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
         .insert_header(("Access-Control-Request-Headers", "content-type"))
         // should also be set by nginx but let's put it here anyway
         .insert_header(("Access-Control-Allow-Origin", "*"))
-        // The above permissions may be cached for 86,400 seconds (1 day)
-        .insert_header(("Access-Control-Max-Age", "86400"))
+        // The above permissions may be cached for 604,800 seconds (1 week)
+        .insert_header(("Access-Control-Max-Age", "604800"))
         .finish()
 }
 
