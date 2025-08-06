@@ -234,7 +234,7 @@
               },
               {
                 "$ref": "#/components/schemas/String",
-                "description": "Null on error"
+                "description": "UUID of the spawned job. Null on error"
               }
             ]
           },
@@ -243,7 +243,7 @@
               "integer",
               "null"
             ],
-            "description": "Position counted from 0. Null if the job is being processed without a queue",
+            "description": "Position counted from 0. Null if the job is being processed without a queue.",
             "minimum": 0
           }
         },

@@ -76,7 +76,7 @@ Creates `Acedrg` job.
   // Null on success
   error_message?: string | null
   job_id?: null | #/components/schemas/String
-  // Position counted from 0. Null if the job is being processed without a queue
+  // Position counted from 0. Null if the job is being processed without a queue.
   queue_position?: integer | null
 }
 ```
@@ -90,7 +90,7 @@ Creates `Acedrg` job.
   // Null on success
   error_message?: string | null
   job_id?: null | #/components/schemas/String
-  // Position counted from 0. Null if the job is being processed without a queue
+  // Position counted from 0. Null if the job is being processed without a queue.
   queue_position?: integer | null
 }
 ```
@@ -104,7 +104,7 @@ Creates `Acedrg` job.
   // Null on success
   error_message?: string | null
   job_id?: null | #/components/schemas/String
-  // Position counted from 0. Null if the job is being processed without a queue
+  // Position counted from 0. Null if the job is being processed without a queue.
   queue_position?: integer | null
 }
 ```
@@ -118,7 +118,7 @@ Creates `Acedrg` job.
   // Null on success
   error_message?: string | null
   job_id?: null | #/components/schemas/String
-  // Position counted from 0. Null if the job is being processed without a queue
+  // Position counted from 0. Null if the job is being processed without a queue.
   queue_position?: integer | null
 }
 ```
@@ -132,7 +132,7 @@ Creates `Acedrg` job.
   // Null on success
   error_message?: string | null
   job_id?: null | #/components/schemas/String
-  // Position counted from 0. Null if the job is being processed without a queue
+  // Position counted from 0. Null if the job is being processed without a queue.
   queue_position?: integer | null
 }
 ```
@@ -220,7 +220,7 @@ The connection ignores all messages sent to it (responds only to Ping messages).
   // Null on success
   error_message?: string | null
   job_id?: null | #/components/schemas/String
-  // Position counted from 0. Null if the job is being processed without a queue
+  // Position counted from 0. Null if the job is being processed without a queue.
   queue_position?: integer | null
 }
 ```
