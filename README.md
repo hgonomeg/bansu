@@ -62,7 +62,8 @@ The following environment variables control the behavior of the server:
 
 ## API
 
-See API documentation [here](API_DOCUMENTATION.md).
+Below is my hand-written documentation.
+For an experimental auto-generated documentation, [click here](API_DOCUMENTATION.md).
 The server exposes the following API:
 
 ### HTTP POST `/run_acedrg`
