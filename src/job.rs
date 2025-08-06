@@ -10,12 +10,15 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+#[cfg(feature = "utoipa")]
+use utoipa::ToSchema;
 pub mod docker;
 pub mod job_handle;
 pub mod job_runner;
 pub mod job_type;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 pub struct JobOutput {
     pub stdout: String,
     pub stderr: String,
