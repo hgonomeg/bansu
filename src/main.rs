@@ -3,7 +3,7 @@ use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{
     get,
     middleware::Condition,
-    /*http::StatusCode*/ post,
+    options, /*http::StatusCode*/ post,
     web::{self, Data},
     App, HttpRequest, HttpResponse, HttpServer,
 };
@@ -112,6 +112,36 @@ async fn job_ws(
     let (response, session, msg_stream) = ws_handle(&req, payload)?;
     WsConnection::new(jm, job_opt, job_id, session, msg_stream);
     Ok(response)
+}
+
+#[options("/run_acedrg")]
+// This is here due to CORS necessities
+async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
+    // if let Some(val) = req.headers().get("Access-Control-Request-Method") {
+    //     if val.to_str().unwrap_or("") != "POST" {
+    //         HttpResponse::BadRequest()
+    //     }
+    // }
+    // if let Some(val) = req.headers().get("Access-Control-Request-Headers") {
+    //     match val.to_str().unwrap_or("") {
+    //         "content-type" | "Content-Type" => {
+
+    //         }
+    //         _ => {
+
+    //         }
+    //     }
+    // }
+    // Anything other than 404 is already nice
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods/OPTIONS#preflighted_requests_in_cors
+    HttpResponse::Ok()
+        .insert_header(("Allow", "OPTIONS, POST"))
+        .insert_header(("Access-Control-Allow-Headers", "content-type"))
+        // should also be set by nginx and therefore let's not put it here, not to cause a collision
+        // .insert_header(("Access-Control-Allow-Origin", "*"))
+        // The above permissions may be cached for 604,800 seconds (1 week)
+        .insert_header(("Access-Control-Max-Age", "604800"))
+        .finish()
 }
 
 #[post("/run_acedrg")]
@@ -286,6 +316,7 @@ async fn main() -> anyhow::Result<()> {
             ))
             .app_data(Data::new(job_manager.clone()))
             .service(run_acedrg)
+            .service(run_acedrg_preflight)
             .service(get_cif)
             .service(job_ws)
     })
