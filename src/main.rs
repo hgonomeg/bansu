@@ -136,7 +136,7 @@ async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods/OPTIONS#preflighted_requests_in_cors
     HttpResponse::Ok()
         .insert_header(("Allow", "OPTIONS, POST"))
-        .insert_header(("Access-Control-Request-Headers", "content-type"))
+        .insert_header(("Access-Control-Allow-Headers", "content-type"))
         // should also be set by nginx and therefore let's not put it here, not to cause a collision
         // .insert_header(("Access-Control-Allow-Origin", "*"))
         // The above permissions may be cached for 604,800 seconds (1 week)
