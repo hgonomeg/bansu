@@ -1,11 +1,10 @@
 use actix::prelude::*;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{
-    get,
+    App, HttpRequest, HttpResponse, HttpServer, get,
     middleware::Condition,
     options, /*http::StatusCode*/ post,
     web::{self, Data},
-    App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_ws::handle as ws_handle;
 use std::{env, sync::Arc};
@@ -14,9 +13,9 @@ use utoipa::OpenApi;
 pub mod job;
 use anyhow::Context;
 use job::{
-    job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
-    job_type::{acedrg::AcedrgJob, JobSpawnError},
     JobEntry, JobManager, LookupJob, NewJob,
+    job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
+    job_type::{JobSpawnError, acedrg::AcedrgJob},
 };
 pub mod messages;
 pub mod utils;
@@ -297,13 +296,18 @@ async fn main() -> anyhow::Result<()> {
 
     if env::var("BANSU_DOCKER").is_err() {
         if env::var("BANSU_DISALLOW_DOCKERLESS").is_ok() {
-            let e = anyhow::anyhow!("No (valid) Docker configuration was provided and BANSU_DISALLOW_DOCKERLESS is set. Refusing to continue.");
+            let e = anyhow::anyhow!(
+                "No (valid) Docker configuration was provided and BANSU_DISALLOW_DOCKERLESS is set. Refusing to continue."
+            );
             log::error!("{}", &e);
             return Err(e);
         }
         log::info!("Testing environment configuration...");
         if let Err(e) = utils::test_dockerless().await {
-            log::error!("Environment test failed: {} Refusing to continue without usable 'acedrg' and 'servalcat'.", &e);
+            log::error!(
+                "Environment test failed: {} Refusing to continue without usable 'acedrg' and 'servalcat'.",
+                &e
+            );
             return Err(e);
         }
     }
@@ -428,7 +432,10 @@ async fn main() -> anyhow::Result<()> {
             #[cfg(feature = "utoipa")] apidoc: Option<utoipa::openapi::OpenApi>,
             #[cfg(not(feature = "utoipa"))] _apidoc: (),
         ) {
-            cfg.service(run_acedrg).service(run_acedrg_preflight).service(get_cif).service(job_ws);
+            cfg.service(run_acedrg)
+                .service(run_acedrg_preflight)
+                .service(get_cif)
+                .service(job_ws);
 
             #[cfg(feature = "utoipa")]
             if let Some(apidoc) = apidoc {

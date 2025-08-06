@@ -268,13 +268,19 @@ impl Handler<MonitorQueuedJob> for JobManager {
                         id
                     );
                     if let Err(e) = msg.1.send(SetRunner(job)).await {
-                        log::warn!("WsConnection could not be notified about job being unqueued (ID={}): {}.",
-                            &id, e);
+                        log::warn!(
+                            "WsConnection could not be notified about job being unqueued (ID={}): {}.",
+                            &id,
+                            e
+                        );
                     }
                 });
             } else {
                 // This should never happen
-                log::error!("Monitoring of queued job requested but the job is neither in queue nor in the jobs map (ID={})", msg.0);
+                log::error!(
+                    "Monitoring of queued job requested but the job is neither in queue nor in the jobs map (ID={})",
+                    msg.0
+                );
             }
         }
     }

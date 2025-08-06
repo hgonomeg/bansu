@@ -1,7 +1,7 @@
 use crate::{
     job::{
-        job_runner::{AddWebSocketAddr, JobRunner, QueryJobData},
         JobData, JobEntry, JobManager, LookupJob, MonitorQueuedJob,
+        job_runner::{AddWebSocketAddr, JobRunner, QueryJobData},
     },
     messages::*,
 };
