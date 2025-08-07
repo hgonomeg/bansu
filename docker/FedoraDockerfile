@@ -3,7 +3,7 @@ RUN dnf update -y
 RUN mkdir -p /download
 RUN mkdir -p /build
 RUN dnf install -y git rust cargo gcc gcc-c++ wget gzip
-RUN dnf install -y python python-devel pybind11-devel python-pybind11 python-nanobind-devel python-numpy python-setuptools python-pandas python-scipy meson
+RUN dnf install -y python python-devel pybind11-devel python-pybind11 python-nanobind-devel python-numpy python-setuptools python-pandas python-scipy python-networkx meson
 RUN dnf install -y boost boost-devel cmake
 RUN dnf install -y make bison flex
 RUN dnf install -y fftw2-devel fftw-devel zlib-devel
