@@ -234,7 +234,6 @@ Combined together gives us:
 
 ## Todo
 
-* Auto-generate Swagger file (likely using utoipa)
 * Do not depend on setenv / getenv for spawning jobs
 * Update job output in realtime
 * Some kind of request logging for statistics
