@@ -9,13 +9,15 @@ use thiserror::Error;
 use super::{job_handle::JobHandle, job_runner::OutputKind};
 
 pub mod acedrg;
-pub mod chemdrasil;
+pub mod atman;
 pub mod servalcat;
 
 #[derive(Error, Debug)]
 pub enum JobSpawnError {
     #[error("Input validation failed: {0}")]
     InputValidation(String),
+    #[error("Too many jobs")]
+    TooManyJobs,
     #[error("{0:#}")]
     Other(#[from] anyhow::Error),
 }
@@ -45,5 +47,5 @@ pub trait Job: Send {
 pub enum JobType {
     Acedrg,
     Servalcat,
-    Chemdrasil,
+    Atman,
 }

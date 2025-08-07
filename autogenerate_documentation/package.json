@@ -1,0 +1,7 @@
+{
+  "name": "autogenerate_documentation",
+  "type": "module",
+  "dependencies": {
+    "@scalar/openapi-to-markdown": "^0.2.26"
+  }
+}

@@ -17,3 +17,9 @@ Cargo.lock
 # Added by cargo
 
 /target
+
+node_tests/node_modules
+node_tests/package-lock.json
+
+autogenerate_documentation/node_modules
+autogenerate_documentation/package-lock.json

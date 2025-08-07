@@ -4,11 +4,11 @@ do_wget() {
   wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 "$@" || exit 7
 }
 
-CHEMDRASIL_VER=0.1.0
+ATMAN_VER=0.1.0
 LIBEIGEN_VER=3.4.0
-RDKIT_VER=2024_03_5
-GEMMI_VER=0.6.6
-SERVALCAT_VER=0.4.77
+RDKIT_VER=2025_03_5
+GEMMI_VER=0.7.3
+SERVALCAT_VER=0.4.105
 # ACEDRG_VER=main
 ACEDRG_VER=bzr
 
@@ -22,8 +22,8 @@ download_all() {
     # Acedrg
     # do_wget https://ccp4forge.rc-harwell.ac.uk/ccp4/acedrg/-/archive/main/acedrg-${ACEDRG_VER}.tar.gz &&\
     # tar -xf acedrg-${ACEDRG_VER}.tar.gz
-    echo Checking-out acedrg with breezy...
-    brz checkout https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/ acedrg-${ACEDRG_VER} || exit 7
+    echo Checking-out acedrg with breezy \(be patient, this may take a long time\)...
+    brz checkout --light https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/ acedrg-${ACEDRG_VER} || exit 7
 
 
     # Libeigen
@@ -43,17 +43,17 @@ download_all() {
     do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz -O servalcat-${SERVALCAT_VER}.tar.gz &&\
     tar -xf servalcat-${SERVALCAT_VER}.tar.gz
 
-    #Chemdrasil
-    do_wget https://github.com/hgonomeg/chemdrasil/archive/refs/tags/v${CHEMDRASIL_VER}.tar.gz -O chemdrasil-${CHEMDRASIL_VER}.tar.gz &&\
-    tar -xf chemdrasil-${CHEMDRASIL_VER}.tar.gz
+    # Atman
+    do_wget https://github.com/hgonomeg/atman/archive/refs/tags/v${ATMAN_VER}.tar.gz -O atman-${ATMAN_VER}.tar.gz &&\
+    tar -xf atman-${ATMAN_VER}.tar.gz
 }
 
-build_chemdrasil() {
+build_atman() {
   setup_build_env
-  mkdir -p /build/chemdrasil
-  cd /build/chemdrasil &&\
+  mkdir -p /build/atman
+  cd /build/atman &&\
   rm -rf *
-  cargo install --path /download/chemdrasil-${CHEMDRASIL_VER} --root /usr --target-dir .
+  cargo install --path /download/atman-${ATMAN_VER} --root /usr --target-dir .
   cd /build
 }
 
@@ -63,8 +63,8 @@ build_eigen() {
   cd /build/eigen &&\
   rm -rf *
   cmake -S /download/eigen-${LIBEIGEN_VER} \
-  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release 
-  cmake --build . && cmake --install .
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release &&\
+  cmake --build . && cmake --install . || exit 8
   cd ..
 }
 
@@ -79,9 +79,8 @@ build_rdkit() {
   -DRDK_BUILD_INCHI_SUPPORT=OFF \
   -DRDK_BUILD_FREETYPE_SUPPORT=OFF \
   -DRDK_INSTALL_COMIC_FONTS=OFF \
-  -DRDK_INSTALL_INTREE=OFF 
-
-  cmake --build . && cmake --install .
+  -DRDK_INSTALL_INTREE=OFF  &&\
+  cmake --build . && cmake --install . || exit 8
   cd ..
 }
 
@@ -91,8 +90,8 @@ build_gemmi() {
   cd /build/gemmi &&\
   rm -rf *
   cmake -S /download/gemmi-${GEMMI_VER} \
-  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release -DUSE_PYTHON=1 -DBUILD_SHARED_LIBS=true
-  cmake --build . && cmake --install .
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release -DUSE_PYTHON=1 -DBUILD_SHARED_LIBS=true &&\
+  cmake --build . && cmake --install . || exit 8
   cd ..
 }
 
@@ -102,8 +101,8 @@ build_acedrg() {
   cd /build/acedrg &&\
   rm -rf *
   cmake -S /download/acedrg-${ACEDRG_VER} \
-  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release 
-  cmake --build . && cmake --install .
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release &&\
+  cmake --build . && cmake --install . || exit 8
   cd ..
 }
 
@@ -113,19 +112,19 @@ build_servalcat() {
   cd /build/servalcat &&\
   rm -rf *
   cmake -S /download/servalcat-${SERVALCAT_VER} \
-  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release 
-  cmake --build . && cmake --install .
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release &&\
+  cmake --build . && cmake --install . || exit 8
   cd ..
 }
 
 
 build_all() {
-    build_eigen
-    build_rdkit
-    build_gemmi
-    build_servalcat
-    build_acedrg
-    build_chemdrasil
+    build_eigen &&\
+    build_rdkit &&\
+    build_gemmi &&\
+    build_servalcat &&\
+    build_acedrg &&\
+    build_atman || exit 8
 
     # Seems to be necessary for RDKit stuff to be found at runtime
     ldconfig
@@ -141,7 +140,7 @@ cleanup_all() {
 
 setup_all() {
   download_all
-  build_all
+  build_all || exit 8
   cleanup_all
 }
 

@@ -1,7 +1,7 @@
 use super::{Job, JobSpawnError, JobType};
 use crate::job::job_handle::{JobHandle, JobProcessConfiguration};
 use crate::job::job_runner::OutputKind;
-use crate::{utils::dump_string_to_file, AcedrgArgs};
+use crate::{AcedrgArgs, utils::dump_string_to_file};
 use futures_util::Future;
 use std::env;
 use std::{
@@ -22,10 +22,14 @@ impl Job for AcedrgJob {
     }
 
     fn timeout_value(&self) -> Duration {
-        if let Some(Ok(tm)) = env::var("BANSU_ACEDRG_TIMEOUT")
-            .ok()
-            .map(|tm| tm.parse::<u64>())
-        {
+        if let Some(Ok(tm)) = env::var("BANSU_ACEDRG_TIMEOUT").ok().map(|tm| {
+            tm.parse::<u64>().inspect_err(|e| {
+                log::error!(
+                    "Acedrg timeout could not be parsed: {}. Default value will be used.",
+                    e
+                )
+            })
+        }) {
             Duration::from_secs(tm)
         } else {
             Duration::from_secs(2 * 60)
@@ -80,10 +84,15 @@ impl Job for AcedrgJob {
         let mut numeric_arg = false;
         for arg in self.args.commandline_args.iter() {
             if !(r_arg || numeric_arg) && !allowed_args.iter().any(|z| z == arg) {
-                return Err(JobSpawnError::InputValidation(format!("Input validation failed! Invalid commandline arguments. Supported arguments are: {:?}", &allowed_args)));
+                return Err(JobSpawnError::InputValidation(format!(
+                    "Input validation failed! Invalid commandline arguments. Supported arguments are: {:?}",
+                    &allowed_args
+                )));
             }
             if r_arg && !arg.chars().all(|chr| chr.is_alphabetic()) {
-                return Err(JobSpawnError::InputValidation(format!("Input validation failed! Non-alphabetic characters used in monomer name (argument of the flag '-r')")));
+                return Err(JobSpawnError::InputValidation(format!(
+                    "Input validation failed! Non-alphabetic characters used in monomer name (argument of the flag '-r')"
+                )));
             }
             if numeric_arg && !arg.chars().all(|chr| chr.is_numeric()) {
                 return Err(JobSpawnError::InputValidation(format!(

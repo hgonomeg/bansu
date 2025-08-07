@@ -1,11 +1,12 @@
 use anyhow::Context;
 use bollard::{
-    container::{
-        AttachContainerOptions, CreateContainerOptions, LogOutput, StartContainerOptions,
+    Docker,
+    container::LogOutput,
+    query_parameters::{
+        AttachContainerOptions, CreateContainerOptionsBuilder, StartContainerOptions,
         WaitContainerOptions,
     },
     secret::{ContainerWaitExitError, ContainerWaitResponse, HostConfig, Mount, MountTypeEnum},
-    Docker,
 };
 use futures_util::StreamExt;
 use uuid::Uuid;
@@ -50,15 +51,13 @@ impl ContainerHandle {
         );
         let u = Uuid::new_v4();
         let container_name = format!("bansu-worker-{}", u.to_string());
-        let config = bollard::container::Config {
-            cmd: Some(command),
-            image: Some(image_name),
-            working_dir: Some(local_working_dir),
+        let config = bollard::models::ContainerCreateBody {
+            cmd: Some(command.into_iter().map(ToString::to_string).collect()),
+            image: Some(image_name.to_string()),
+            working_dir: Some(local_working_dir.to_string()),
             attach_stdout: Some(true),
             attach_stderr: Some(true),
-            // We are probably gonna run as root anyway.
-            // Running as non-root currently causes permission issues
-            // while deleting temporary files
+            // User shall be configured in the Dockerfile, not here
             // user: Some("bansu"),
             host_config: mount_bind.map(|(src, dst)| HostConfig {
                 mounts: Some(vec![Mount {
@@ -72,11 +71,11 @@ impl ContainerHandle {
             }),
             ..Default::default()
         };
-        log::debug!("Creating container \"{}\"", &container_name);
-        let opts = CreateContainerOptions {
-            name: container_name.clone(),
-            platform: None::<String>,
-        };
+        log::trace!("Creating container \"{}\"", &container_name);
+        let opts = CreateContainerOptionsBuilder::new()
+            .name(&container_name)
+            //.platform("linux")
+            .build();
         // begin_time = tokio::time::Instant::now();
         let container = docker
             .create_container(Some(opts), config)
@@ -87,7 +86,7 @@ impl ContainerHandle {
         //     "Took {} ms to create Docker container",
         //     (creation_time - begin_time).as_millis()
         // );
-        log::info!(
+        log::debug!(
             "Created Docker container with id={} name={}",
             &container.id,
             &container_name
@@ -106,7 +105,7 @@ impl ContainerHandle {
         let mut wait_stream = self.docker.wait_container(
             &self.id,
             Some(WaitContainerOptions {
-                condition: "not-running",
+                condition: "not-running".to_string(),
             }),
         );
         log::debug!("Launching Docker container {}", &self.id);
@@ -115,12 +114,12 @@ impl ContainerHandle {
             .docker
             .attach_container(
                 &self.id,
-                Some(AttachContainerOptions::<String> {
-                    stdin: Some(false),
-                    stdout: Some(true),
-                    stderr: Some(true),
-                    stream: Some(true),
-                    logs: Some(true),
+                Some(AttachContainerOptions {
+                    stdin: false,
+                    stdout: true,
+                    stderr: true,
+                    stream: true,
+                    logs: true,
                     ..Default::default()
                 }),
             )
@@ -147,7 +146,7 @@ impl ContainerHandle {
         });
 
         self.docker
-            .start_container(&self.id, None::<StartContainerOptions<String>>)
+            .start_container(&self.id, None::<StartContainerOptions>)
             .await
             .with_context(|| "Could not start Docker container")?;
 
@@ -166,7 +165,7 @@ impl ContainerHandle {
                     exit_info = Some(ei);
                 }
                 // This uglyness prevents misinterpreting the failure of processes
-                // running in Docker as failure or the waiting procedure itself
+                // running in Docker as failure of the waiting procedure itself
                 Err(bollard::errors::Error::DockerContainerWaitError { error, code }) => {
                     // log::warn!("Error {:#?}", e);
                     exit_info = Some(ContainerWaitResponse {
@@ -187,7 +186,7 @@ impl ContainerHandle {
             .unwrap()
             .with_context(|| "Failed to collect logs from the container")?;
 
-        log::info!("Finished running in Docker container {}", &self.id);
+        log::debug!("Finished running in Docker container {}", &self.id);
 
         Ok(ContainerHandleOutput {
             exit_info: exit_info.unwrap(),
@@ -198,11 +197,15 @@ impl ContainerHandle {
 
 impl Drop for ContainerHandle {
     fn drop(&mut self) {
+        use bollard::query_parameters::{RemoveContainerOptions, StopContainerOptions};
         let id = std::mem::take(&mut self.id);
         let d = self.docker.clone();
         actix_rt::spawn(async move {
-            log::info!("Removing container {}", &id);
-            if let Err(e) = d.remove_container(&id, None).await {
+            log::debug!("Removing container {}", &id);
+            if let Err(e) = d
+                .remove_container(&id, None::<RemoveContainerOptions>)
+                .await
+            {
                 log::warn!(
                     "Could not remove container {}: {}. Attempting to stop it...",
                     &id,
@@ -212,10 +215,14 @@ impl Drop for ContainerHandle {
                 return;
             }
             actix_rt::task::yield_now().await;
-            if let Err(e) = d.stop_container(&id, None).await {
+            if let Err(e) = d.stop_container(&id, None::<StopContainerOptions>).await {
                 log::warn!("Could not stop container {}: {}.", &id, e);
             }
-            if let Err(e) = d.remove_container(&id, None).await {
+            actix_rt::task::yield_now().await;
+            if let Err(e) = d
+                .remove_container(&id, None::<RemoveContainerOptions>)
+                .await
+            {
                 log::error!(
                     "Could not remove container {}: {}. No further attempts will be made.",
                     &id,
