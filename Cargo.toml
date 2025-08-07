@@ -16,7 +16,7 @@ actix-rt = "2"
 actix-web = "4"
 actix-ws = "0.3"
 anyhow = "1"
-bollard = { version = "0.17", features = ["tokio-stream"] }
+bollard = { version = "0.19", features = ["tokio-stream"] }
 # bytes = "1"
 futures-util = "0.3"
 log = "0.4"
