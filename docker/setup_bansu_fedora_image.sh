@@ -49,8 +49,8 @@ build_eigen() {
   cd /build/eigen &&\
   rm -rf *
   cmake -S /download/eigen-${LIBEIGEN_VER} \
-  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release 
-  cmake --build . && cmake --install .
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release &&\
+  cmake --build . && cmake --install . || exit 8
   cd ..
 }
 
@@ -65,9 +65,8 @@ build_rdkit() {
   -DRDK_BUILD_INCHI_SUPPORT=OFF \
   -DRDK_BUILD_FREETYPE_SUPPORT=OFF \
   -DRDK_INSTALL_COMIC_FONTS=OFF \
-  -DRDK_INSTALL_INTREE=OFF 
-
-  cmake --build . && cmake --install .
+  -DRDK_INSTALL_INTREE=OFF  &&\
+  cmake --build . && cmake --install . || exit 8
   cd ..
 }
 
@@ -77,8 +76,8 @@ build_gemmi() {
   cd /build/gemmi &&\
   rm -rf *
   cmake -S /download/gemmi-${GEMMI_VER} \
-  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release -DUSE_PYTHON=1 -DBUILD_SHARED_LIBS=true
-  cmake --build . && cmake --install .
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release -DUSE_PYTHON=1 -DBUILD_SHARED_LIBS=true &&\
+  cmake --build . && cmake --install . || exit 8
   cd ..
 }
 
@@ -88,8 +87,8 @@ build_acedrg() {
   cd /build/acedrg &&\
   rm -rf *
   cmake -S /download/acedrg-${ACEDRG_VER} \
-  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release 
-  cmake --build . && cmake --install .
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release &&\
+  cmake --build . && cmake --install . || exit 8
   cd ..
 }
 
@@ -99,18 +98,18 @@ build_servalcat() {
   cd /build/servalcat &&\
   rm -rf *
   cmake -S /download/servalcat-${SERVALCAT_VER} \
-  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release 
-  cmake --build . && cmake --install .
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release &&\
+  cmake --build . && cmake --install . || exit 8
   cd ..
 }
 
 
 build_all() {
-    build_eigen
-    build_rdkit
-    build_gemmi
-    build_servalcat
-    build_acedrg
+    build_eigen &&\
+    build_rdkit &&\
+    build_gemmi &&\
+    build_servalcat &&\
+    build_acedrg || exit 8
 
     # Seems to be necessary for RDKit stuff to be found at runtime
     ldconfig
@@ -126,7 +125,7 @@ cleanup_all() {
 
 setup_all() {
   download_all
-  build_all
+  build_all || exit 8
   cleanup_all
 }
 
