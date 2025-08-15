@@ -14,6 +14,10 @@ pub struct JobProcessConfiguration<'a> {
 }
 
 #[derive(Debug)]
+/// [JobHandle] wraps a pending job.
+/// [JobHandle]s are used by JobRunner's workers to run jobs.
+///
+/// Underneath, a [JobHandle] can either be a child process or a Docker container.
 pub enum JobHandle {
     Direct(Child),
     Docker(ContainerHandle),
@@ -53,6 +57,8 @@ impl JobHandle {
             Ok(Self::Direct(child))
         }
     }
+    /// Awaits upon the completion of the job and returns the output.
+    ///
     /// This API is currently experimental
     pub async fn join(self) -> anyhow::Result<Output> {
         match self {

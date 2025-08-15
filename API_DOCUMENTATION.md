@@ -195,6 +195,57 @@ Creates `Acedrg` job.
 }
 ```
 
+### GET /vibe\_check
+
+- **Method:** `GET`
+- **Path:** `/vibe_check`
+- **Tags:** 
+
+Health check endpoint.
+
+#### Responses
+
+##### Status: 200 Server is up and running
+
+###### Content-Type: application/json
+
+- **`active_jobs` (required)**
+
+  `integer` — Number of jobs currently being processed (or still available for downloading job results)
+
+- **`uptime` (required)**
+
+  `integer`, format: `int64` — Uptime in seconds
+
+- **`version` (required)**
+
+  `string` — Bansu version
+
+- **`max_concurrent_jobs`**
+
+  `integer | null` — Max number of jobs to be run in parallel
+
+- **`max_queue_length`**
+
+  `integer | null` — Max length of the queue or null if queue disabled
+
+- **`queue_length`**
+
+  `integer | null` — Length of the queue or null if queue disabled
+
+**Example:**
+
+```
+{
+  "active_jobs": 13,
+  "max_concurrent_jobs": 10,
+  "max_queue_length": 30,
+  "queue_length": 12,
+  "uptime": 986986,
+  "version": "v0.4.0"
+}
+```
+
 ### GET /ws/{job\_id}
 
 - **Method:** `GET`
@@ -354,6 +405,49 @@ Contains input SMILES string and an array of additional arguments passed to Aced
 - **Type:**`string`
 
 **Example:**
+
+### VibeCheckResponse
+
+- **Type:**`object`
+
+Response to a vibe check request
+
+- **`active_jobs` (required)**
+
+  `integer` — Number of jobs currently being processed (or still available for downloading job results)
+
+- **`uptime` (required)**
+
+  `integer`, format: `int64` — Uptime in seconds
+
+- **`version` (required)**
+
+  `string` — Bansu version
+
+- **`max_concurrent_jobs`**
+
+  `integer | null` — Max number of jobs to be run in parallel
+
+- **`max_queue_length`**
+
+  `integer | null` — Max length of the queue or null if queue disabled
+
+- **`queue_length`**
+
+  `integer | null` — Length of the queue or null if queue disabled
+
+**Example:**
+
+```
+{
+  "active_jobs": 13,
+  "max_concurrent_jobs": 10,
+  "max_queue_length": 30,
+  "queue_length": 12,
+  "uptime": 986986,
+  "version": "v0.4.0"
+}
+```
 
 ### WsJobDataUpdate
 

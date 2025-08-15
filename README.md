@@ -66,6 +66,34 @@ Below is my hand-written documentation.
 For an experimental auto-generated documentation, [click here](API_DOCUMENTATION.md).
 The server exposes the following API:
 
+### HTTP GET `/vibe_check`
+
+Health check endpoint.
+
+Returns the following JSON:
+
+```json5
+{
+    /// Bansu version
+    "version": "v0.4.0",
+    /// Current length of the queue or null if queue disabled
+    "queue_length": 12,
+    /// Max length of the queue or null if queue disabled
+    "max_queue_length": 30,
+    /// Number of jobs currently being processed (or still available for downloading job results)
+    "active_jobs": 13,
+    /// Max number of jobs to be run in parallel
+    "max_concurrent_jobs": 10,
+    /// Uptime in seconds
+    "uptime": 986986
+}
+```
+
+Returns:
+
+* `200 OK` - All is ok.
+
+
 ### HTTP POST `/run_acedrg`
 
 Creates `Acedrg` job.
