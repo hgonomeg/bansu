@@ -12,7 +12,7 @@ pub type JobId = String;
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[cfg_attr(feature = "utoipa", schema(example = json!({
-    "version": "v0.4.0",
+    "bansu_version": "0.4.0",
     "queue_length": 12,
     "max_queue_length": 30,
     "active_jobs": 13,
@@ -22,7 +22,7 @@ pub type JobId = String;
 /// Response to a vibe check request
 pub struct VibeCheckResponse {
     /// Bansu version
-    pub version: String,
+    pub bansu_version: String,
     /// Length of the queue or null if queue disabled
     pub queue_length: Option<usize>,
     /// Max length of the queue or null if queue disabled
@@ -38,7 +38,7 @@ pub struct VibeCheckResponse {
 impl VibeCheckResponse {
     pub fn build(jmvc: JobManagerVibeCheckReply, state: &State) -> Self {
         Self {
-            version: state.version.to_owned(),
+            bansu_version: state.version.to_owned(),
             queue_length: jmvc.queue_length,
             max_queue_length: jmvc.max_queue_length,
             active_jobs: jmvc.active_jobs,

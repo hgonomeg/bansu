@@ -217,7 +217,7 @@ Health check endpoint.
 
   `integer`, format: `int64` — Uptime in seconds
 
-- **`version` (required)**
+- **`bansu_version` (required)**
 
   `string` — Bansu version
 
@@ -242,7 +242,7 @@ Health check endpoint.
   "max_queue_length": 30,
   "queue_length": 12,
   "uptime": 986986,
-  "version": "v0.4.0"
+  "bansu_version": "v0.4.0"
 }
 ```
 
@@ -445,7 +445,7 @@ Response to a vibe check request
   "max_queue_length": 30,
   "queue_length": 12,
   "uptime": 986986,
-  "version": "v0.4.0"
+  "version": "0.4.0"
 }
 ```
 
