@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import * as https from 'https';
 import * as http from 'http';
+import * as crypto from 'crypto';
 
 function get_addr_port_path_and_protocol() {
   const url = new URL(process.env.BANSU_URL ? process.env.BANSU_URL : "http://localhost:8080");
@@ -60,9 +61,17 @@ function get_cif(job_id) {
       //console.log('CIF downloaded: ');
       let cif_file_string = Buffer.concat(data).toString();
       console.log('CIF file length: ', cif_file_string.length);
+      try {
+        const hash = crypto.createHash('sha256').update(cif_file_string).digest('hex');
+        console.log("CIF file SHA256 hash: ", hash);
+      } catch (err) {
+        console.error("Error creating hash: ", err);
+        // process.exit(8);
+      }
       process.exit(0);
     });
   };
+  
   if (protocol === 'https:') {
     https.get(m_url, req_callback).on('error', err_handler);
   } else {
@@ -110,6 +119,7 @@ function open_ws_connection(data) {
           const stdout_len = wsJson.job_output.stdout.length;
           const stderr_len = wsJson.job_output.stderr.length;
           console.log(`Job has finished successfully! stdout_len: ${stdout_len} stderr_len: ${stderr_len}`);
+          console.info("Job output JSON raw: ", wsJson.job_output);
           get_cif(jsonData.job_id);
         } else if (wsJson.status == "Failed") {
           console.log(`Job failed! \nOutput: ${JSON.stringify(wsJson.job_output)}\n\nError message: ${wsJson.error_message}\nFailure reason: ${wsJson.failure_reason}`);
