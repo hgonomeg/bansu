@@ -197,12 +197,11 @@ In order to test Bansu, you can make use of the provided Node.JS script.
 0. Launch the Bansu server
 1. Go to `node_tests/`
 2. Run `npm install` to fetch Node dependencies
-3. Run `node localhost_test.mjs` - it will spawn an Acedrg job, then wait until it finishes and try to get CIF.
+3. Run `node test_acedrg_job.mjs` - it will spawn an Acedrg job, then wait until it finishes and try to get CIF.
 
 Environment variables for the test:
 
-* `BANSU_ADDRESS` - as for the server
-* `BANSU_PORT` - as for the server
+* `BANSU_URL` - the URL to be used for Bansu connection (default: `http://localhost:8080`)
 * `BANSU_TEST_SMILES` - SMILES string used for testing (default: `c1ccccc1`)
 * `BANSU_TEST_ACEDRG_ARGS` - Args for Acedrg (default: `[]`) This is a JSON array of commandline arguments. 
 
