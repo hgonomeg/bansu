@@ -197,7 +197,7 @@ There is one optional runtime dependency: Docker.
 The server manages docker containers (as described above in the security section).
 It needs to have adequate permissions in order to do that.
 The server uses the `bollard` crate to setup Docker connection using platform-dependent defaults (Unix pipe, Windows socket, fallback: HTTP).
-Refer to [bollard documentation for more details](https://docs.rs/bollard/0.17.1/bollard/struct.Docker.html#method.connect_with_defaults).
+Refer to [bollard documentation for more details](https://docs.rs/bollard/0.19.2/bollard/struct.Docker.html#method.connect_with_defaults).
 
 If you do not want to make use of Docker support, make sure that `acedrg` and `servalcat` are available in the system path.
 
