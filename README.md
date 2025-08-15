@@ -80,8 +80,10 @@ Returns the following JSON:
     "queue_length": 12,
     /// Max length of the queue or null if queue disabled
     "max_queue_length": 30,
-    /// Number of jobs currently being processed
-    "active_jobs": 3,
+    /// Number of jobs currently being processed (or still available for downloading job results)
+    "active_jobs": 13,
+    /// Max number of jobs to be run in parallel
+    "max_concurrent_jobs": 10,
     /// Uptime in seconds
     "uptime": 986986
 }

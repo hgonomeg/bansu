@@ -493,6 +493,8 @@ async fn main() -> anyhow::Result<()> {
     }
 
     log::info!("Initializing HTTP server...");
+
+    let state_data = Data::new(State::new(max_concurrent_jobs));
     Ok(HttpServer::new(move || {
         let pconfig = config.clone();
         App::new()
@@ -501,7 +503,7 @@ async fn main() -> anyhow::Result<()> {
                 Governor::new(&governor_conf),
             ))
             .app_data(Data::new(job_manager.clone()))
-            .app_data(State::new())
+            .app_data(state_data.clone())
             .configure(|cfg: &mut actix_web::web::ServiceConfig| configure_paths(cfg, pconfig))
     })
     .bind((addr, port))?

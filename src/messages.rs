@@ -15,9 +15,11 @@ pub type JobId = String;
     "version": "v0.4.0",
     "queue_length": 12,
     "max_queue_length": 30,
-    "active_jobs": 3,
+    "active_jobs": 13,
+    "max_concurrent_jobs": 10,
     "uptime": 986986
 })))]
+/// Response to a vibe check request
 pub struct VibeCheckResponse {
     /// Bansu version
     pub version: String,
@@ -25,8 +27,10 @@ pub struct VibeCheckResponse {
     pub queue_length: Option<usize>,
     /// Max length of the queue or null if queue disabled
     pub max_queue_length: Option<usize>,
-    /// Number of jobs currently being processed
+    /// Number of jobs currently being processed (or still available for downloading job results)
     pub active_jobs: usize,
+    /// Max number of jobs to be run in parallel
+    pub max_concurrent_jobs: Option<usize>,
     /// Uptime in seconds
     pub uptime: u64,
 }
@@ -38,6 +42,7 @@ impl VibeCheckResponse {
             queue_length: jmvc.queue_length,
             max_queue_length: jmvc.max_queue_length,
             active_jobs: jmvc.active_jobs,
+            max_concurrent_jobs: state.max_concurrent_jobs,
             uptime: state.uptime(),
         }
     }
