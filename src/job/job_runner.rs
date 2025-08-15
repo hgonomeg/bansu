@@ -1,4 +1,4 @@
-use super::job_handle::JobHandle;
+use super::job_handle::{JobHandle, JobHandleConfiguration};
 use super::job_type::{Job, JobSpawnError};
 use super::{JobData, JobFailureReason, JobOutput, JobStatus};
 use crate::{utils::*, ws_connection::WsConnection};
@@ -79,7 +79,7 @@ impl Handler<QueryJobData> for JobRunner {
 #[derive(Message)]
 #[rtype(result = "()")]
 /// Used to initialize an (un)queued job in the background.
-struct InitializeQueuedJob(pub Option<OwnedSemaphorePermit>);
+struct InitializeQueuedJob(pub Option<OwnedSemaphorePermit>, JobHandleConfiguration);
 
 impl Handler<InitializeQueuedJob> for JobRunner {
     type Result = ();
@@ -87,9 +87,10 @@ impl Handler<InitializeQueuedJob> for JobRunner {
     fn handle(&mut self, msg: InitializeQueuedJob, ctx: &mut Self::Context) -> Self::Result {
         let id = self.id.clone();
         let jo = self.job_object.clone();
+        let jh_cfg = msg.1;
         let fut = actix::fut::wrap_future::<_, Self>(async move {
             log::debug!("Initializing queued job");
-            Self::try_init(&id, &jo).await
+            Self::try_init(&id, &jo, jh_cfg).await
         })
         .map(|res, actor, ctx| {
             match res {
@@ -219,6 +220,7 @@ impl JobRunner {
     async fn try_init(
         id: &str,
         job_object: &Arc<dyn Job>,
+        jh_config: JobHandleConfiguration,
     ) -> Result<(WorkDir, JobHandle), JobSpawnError> {
         log::info!("Creating new {} job - {}", job_object.name(), &id);
         job_object.validate_input()?;
@@ -231,7 +233,7 @@ impl JobRunner {
             .with_context(|| "Could not write input for job")?;
         log::info!("{} - Starting job", &id);
         let jhandle = job_object
-            .launch(&workdir.path, &input_path)
+            .launch(jh_config, &workdir.path, &input_path)
             .await
             .with_context(|| "Could not start job")?;
         Ok((workdir, jhandle))
@@ -243,8 +245,9 @@ impl JobRunner {
         id: String,
         job_object: Arc<dyn Job>,
         semaphore_permit: Option<OwnedSemaphorePermit>,
+        jh_config: JobHandleConfiguration,
     ) -> Result<Addr<JobRunner>, JobSpawnError> {
-        let (workdir, jhandle) = Self::try_init(&id, &job_object).await?;
+        let (workdir, jhandle) = Self::try_init(&id, &job_object, jh_config).await?;
         let timeout_val = job_object.timeout_value();
         let ret = Self {
             id: id.clone(),
@@ -273,6 +276,7 @@ impl JobRunner {
         id: String,
         job_object: Arc<dyn Job>,
         semaphore_permit: Option<OwnedSemaphorePermit>,
+        jh_config: JobHandleConfiguration,
     ) -> Addr<JobRunner> {
         let ret = Self {
             id: id.clone(),
@@ -285,7 +289,7 @@ impl JobRunner {
             websocket_addrs: vec![],
         }
         .start();
-        ret.do_send(InitializeQueuedJob(semaphore_permit));
+        ret.do_send(InitializeQueuedJob(semaphore_permit, jh_config));
         ret
     }
 }

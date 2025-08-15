@@ -14,6 +14,7 @@ pub mod job;
 use anyhow::Context;
 use job::{
     JobEntry, JobManager, JobManagerVibeCheck, LookupJob, NewJob,
+    job_handle::JobHandleConfiguration,
     job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
     job_type::{JobSpawnError, acedrg::AcedrgJob},
 };
@@ -303,22 +304,21 @@ async fn main() -> anyhow::Result<()> {
         .with_context(|| "Could not parse port number")?
         .unwrap_or(8080);
 
-    if let Ok(docker_image_name) = env::var("BANSU_DOCKER") {
+    let docker_configuration = if let Ok(docker_image_name) = env::var("BANSU_DOCKER") {
         log::info!("Testing Docker configuration...");
         if let Err(e) = utils::test_docker(&docker_image_name).await {
             log::error!("Docker test failed - {:#}. Disabling Docker support.", e);
-            // todo: Do not depend on setenv / getenv while spawning jobs
-            unsafe {
-                env::remove_var("BANSU_DOCKER");
-            }
+            None
         } else {
             log::info!("Docker test successful.");
+            Some(docker_image_name)
         }
     } else {
         log::info!("Docker configuration was not provided.");
-    }
+        None
+    };
 
-    if env::var("BANSU_DOCKER").is_err() {
+    if docker_configuration.is_none() {
         if env::var("BANSU_DISALLOW_DOCKERLESS").is_ok() {
             let e = anyhow::anyhow!(
                 "No (valid) Docker configuration was provided and BANSU_DISALLOW_DOCKERLESS is set. Refusing to continue."
@@ -336,7 +336,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    if env::var("BANSU_DOCKER").is_ok() {
+    if docker_configuration.is_some() {
         log::info!("Starting with Docker support.");
     } else {
         log::info!("Starting without Docker support.");
@@ -370,7 +370,15 @@ async fn main() -> anyhow::Result<()> {
         }
     );
 
-    let job_manager = JobManager::new(max_concurrent_jobs, max_queue_length).start();
+    let state_data = Data::new(State::new(max_concurrent_jobs));
+    let job_manager = JobManager::new(
+        max_concurrent_jobs,
+        max_queue_length,
+        JobHandleConfiguration {
+            docker_image: docker_configuration,
+        },
+    )
+    .start();
 
     let governor_conf = if env::var("BANSU_DISABLE_RATELIMIT").is_err() {
         let burst_size = env::var("BANSU_RATELIMIT_BURST_SIZE")
@@ -494,8 +502,6 @@ async fn main() -> anyhow::Result<()> {
     }
 
     log::info!("Initializing HTTP server...");
-
-    let state_data = Data::new(State::new(max_concurrent_jobs));
     Ok(HttpServer::new(move || {
         let pconfig = config.clone();
         App::new()
