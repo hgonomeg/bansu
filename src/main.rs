@@ -13,16 +13,19 @@ use utoipa::OpenApi;
 pub mod job;
 use anyhow::Context;
 use job::{
-    JobEntry, JobManager, LookupJob, NewJob,
+    JobEntry, JobManager, JobManagerVibeCheck, LookupJob, NewJob,
     job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
     job_type::{JobSpawnError, acedrg::AcedrgJob},
 };
 pub mod messages;
+use messages::*;
 pub mod utils;
 pub mod ws_connection;
-use messages::*;
-use tokio::io::AsyncReadExt;
 use ws_connection::WsConnection;
+pub mod state;
+use state::State;
+use tokio::io::AsyncReadExt;
+
 // use log::{info,warn,error,debug};
 
 #[cfg(feature = "utoipa")]
@@ -32,7 +35,7 @@ use ws_connection::WsConnection;
         title = "Bansu",
         description = "Server-side computation API for Moorhen"
     ),
-    paths(get_cif, run_acedrg, job_ws)
+    paths(get_cif, run_acedrg, job_ws, vibe_check)
 )]
 struct ApiDoc;
 
@@ -262,11 +265,22 @@ async fn run_acedrg(
 
 #[cfg_attr(
     feature = "utoipa",
-    utoipa::path(description = "Health check endpoint.",)
-)]
+    utoipa::path(description = "Health check endpoint.",
+    responses(
+        (status = 200, description = "Server is up and running", body = VibeCheckResponse),
+        // (status = 500, description = "Server is not running properly")
+    ),
+))]
 #[get("/vibe_check")]
-async fn vibe_check() -> HttpResponse {
-    HttpResponse::Ok().body("Bansu is running!")
+async fn vibe_check(
+    job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+) -> HttpResponse {
+    log::info!("/vibe_check - Replying to vibe check request");
+    // We can safely unwrap because JobManagerVibeCheck does not fail
+    let jmvc = job_manager.send(JobManagerVibeCheck).await.unwrap();
+    let response = VibeCheckResponse::build(jmvc, &state);
+    HttpResponse::Ok().json(response)
 }
 
 #[actix_web::main]
@@ -487,6 +501,7 @@ async fn main() -> anyhow::Result<()> {
                 Governor::new(&governor_conf),
             ))
             .app_data(Data::new(job_manager.clone()))
+            .app_data(State::new())
             .configure(|cfg: &mut actix_web::web::ServiceConfig| configure_paths(cfg, pconfig))
     })
     .bind((addr, port))?

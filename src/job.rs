@@ -342,6 +342,31 @@ impl Handler<NewJob> for JobManager {
     }
 }
 
+/// [JobManager]'s part of the VibeCheckResponse.
+#[derive(MessageResponse)]
+pub struct JobManagerVibeCheckReply {
+    pub queue_length: Option<usize>,
+    pub max_queue_length: Option<usize>,
+    pub active_jobs: usize,
+}
+
+pub struct JobManagerVibeCheck;
+impl Message for JobManagerVibeCheck {
+    type Result = JobManagerVibeCheckReply;
+}
+
+impl Handler<JobManagerVibeCheck> for JobManager {
+    type Result = <JobManagerVibeCheck as actix::Message>::Result;
+
+    fn handle(&mut self, _msg: JobManagerVibeCheck, _ctx: &mut Self::Context) -> Self::Result {
+        JobManagerVibeCheckReply {
+            queue_length: self.job_queue.as_ref().map(|q| q.data.len()),
+            max_queue_length: self.job_queue.as_ref().map(|q| q.max_len),
+            active_jobs: self.jobs.len(),
+        }
+    }
+}
+
 impl JobManager {
     pub fn new(max_jobs: Option<usize>, max_queue_length: Option<usize>) -> Self {
         log::info!("Initializing JobManager.");

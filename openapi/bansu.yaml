@@ -73,6 +73,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobSpawnReply'
+  /vibe_check:
+    get:
+      tags: []
+      description: Health check endpoint.
+      operationId: vibe_check
+      responses:
+        '200':
+          description: Server is up and running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VibeCheckResponse'
   /ws/{job_id}:
     get:
       tags: []
@@ -186,6 +198,43 @@ components:
       - Queued
     String:
       type: string
+    VibeCheckResponse:
+      type: object
+      required:
+      - version
+      - active_jobs
+      - uptime
+      properties:
+        active_jobs:
+          type: integer
+          description: Number of jobs currently being processed
+          minimum: 0
+        max_queue_length:
+          type:
+          - integer
+          - 'null'
+          description: Max length of the queue or null if queue disabled
+          minimum: 0
+        queue_length:
+          type:
+          - integer
+          - 'null'
+          description: Length of the queue or null if queue disabled
+          minimum: 0
+        uptime:
+          type: integer
+          format: int64
+          description: Uptime in seconds
+          minimum: 0
+        version:
+          type: string
+          description: Bansu version
+      example:
+        active_jobs: 3
+        max_queue_length: 30
+        queue_length: 12
+        uptime: 986986
+        version: v0.4.0
     WsJobDataUpdate:
       type: object
       required:

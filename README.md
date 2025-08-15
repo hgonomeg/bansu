@@ -76,14 +76,20 @@ Returns the following JSON:
 {
     /// Bansu version
     "version": "v0.4.0",
-    /// Length of the queue or null if queue disabled
+    /// Current length of the queue or null if queue disabled
     "queue_length": 12,
+    /// Max length of the queue or null if queue disabled
+    "max_queue_length": 30,
     /// Number of jobs currently being processed
     "active_jobs": 3,
     /// Uptime in seconds
     "uptime": 986986
 }
 ```
+
+Returns:
+
+* `200 OK` - All is ok.
 
 
 ### HTTP POST `/run_acedrg`
