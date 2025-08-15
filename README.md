@@ -66,6 +66,10 @@ Below is my hand-written documentation.
 For an experimental auto-generated documentation, [click here](API_DOCUMENTATION.md).
 The server exposes the following API:
 
+### HTTP GET `/vibe_check`
+
+Health check endpoint.
+
 ### HTTP POST `/run_acedrg`
 
 Creates `Acedrg` job.

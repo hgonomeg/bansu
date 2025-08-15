@@ -260,6 +260,15 @@ async fn run_acedrg(
     }
 }
 
+#[cfg_attr(
+    feature = "utoipa",
+    utoipa::path(description = "Health check endpoint.",)
+)]
+#[get("/vibe_check")]
+async fn vibe_check() -> HttpResponse {
+    HttpResponse::Ok().body("Bansu is running!")
+}
+
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     eprintln!(
@@ -432,7 +441,8 @@ async fn main() -> anyhow::Result<()> {
             #[cfg(feature = "utoipa")] apidoc: Option<utoipa::openapi::OpenApi>,
             #[cfg(not(feature = "utoipa"))] _apidoc: (),
         ) {
-            cfg.service(run_acedrg)
+            cfg.service(vibe_check)
+                .service(run_acedrg)
                 .service(run_acedrg_preflight)
                 .service(get_cif)
                 .service(job_ws);
