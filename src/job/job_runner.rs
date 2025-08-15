@@ -28,6 +28,7 @@ pub struct OutputFileRequest {
     pub kind: OutputKind,
 }
 
+/// JobRunner is used to run and monitor jobs.
 pub struct JobRunner {
     id: String,
     data: JobData,
@@ -77,7 +78,8 @@ impl Handler<QueryJobData> for JobRunner {
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct InitializeQueuedJob(pub Option<OwnedSemaphorePermit>);
+/// Used to initialize an (un)queued job in the background.
+struct InitializeQueuedJob(pub Option<OwnedSemaphorePermit>);
 
 impl Handler<InitializeQueuedJob> for JobRunner {
     type Result = ();
@@ -196,6 +198,7 @@ impl Handler<OutputFileRequest> for JobRunner {
 }
 
 impl JobRunner {
+    /// Worker function calls join() on the JobHandle, takes care of the semaphore permit, manages job timeouts and sends the result of the job back to the JobRunner.
     async fn worker(
         handle: JobHandle,
         addr: Addr<Self>,
@@ -233,7 +236,9 @@ impl JobRunner {
             .with_context(|| "Could not start job")?;
         Ok((workdir, jhandle))
     }
-    /// Creates a regular (non-queued) job
+    /// Creates and spawns a regular (non-queued) job
+    ///
+    /// Awaits for the job to be spawned before returning.
     pub async fn try_create_job(
         id: String,
         job_object: Arc<dyn Job>,
@@ -258,7 +263,11 @@ impl JobRunner {
             ret
         }))
     }
-
+    /// Creates a job that has just been unqueued.
+    /// The main difference between this and `try_create_job` is that
+    /// this function does not wait for the job to be initialized but returns immediately
+    /// and instead starts job initialization in the background.
+    ///
     /// In case of errors, spawns errored-out job
     pub fn create_queued_job(
         id: String,

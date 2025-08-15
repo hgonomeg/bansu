@@ -5,6 +5,25 @@ use utoipa::ToSchema;
 
 pub type JobId = String;
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", schema(example = json!({
+    "version": "v0.4.0",
+    "queue_length": 12,
+    "active_jobs": 3,
+    "uptime": 986986
+})))]
+pub struct VibeCheckResponse {
+    /// Bansu version
+    pub version: String,
+    /// Length of the queue or null if queue disabled
+    pub queue_length: Option<usize>,
+    /// Number of jobs currently being processed
+    pub active_jobs: usize,
+    /// Uptime in seconds
+    pub uptime: u64,
+}
+
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 pub enum JobStatusInfo {

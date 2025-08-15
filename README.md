@@ -70,6 +70,22 @@ The server exposes the following API:
 
 Health check endpoint.
 
+Returns the following JSON:
+
+```json5
+{
+    /// Bansu version
+    "version": "v0.4.0",
+    /// Length of the queue or null if queue disabled
+    "queue_length": 12,
+    /// Number of jobs currently being processed
+    "active_jobs": 3,
+    /// Uptime in seconds
+    "uptime": 986986
+}
+```
+
+
 ### HTTP POST `/run_acedrg`
 
 Creates `Acedrg` job.
