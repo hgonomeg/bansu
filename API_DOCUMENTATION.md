@@ -211,7 +211,7 @@ Health check endpoint.
 
 - **`active_jobs` (required)**
 
-  `integer` — Number of jobs currently being processed
+  `integer` — Number of jobs currently being processed (or still available for downloading job results)
 
 - **`uptime` (required)**
 
@@ -220,6 +220,10 @@ Health check endpoint.
 - **`version` (required)**
 
   `string` — Bansu version
+
+- **`max_concurrent_jobs`**
+
+  `integer | null` — Max number of jobs to be run in parallel
 
 - **`max_queue_length`**
 
@@ -233,7 +237,8 @@ Health check endpoint.
 
 ```
 {
-  "active_jobs": 3,
+  "active_jobs": 13,
+  "max_concurrent_jobs": 10,
   "max_queue_length": 30,
   "queue_length": 12,
   "uptime": 986986,
@@ -405,23 +410,29 @@ Contains input SMILES string and an array of additional arguments passed to Aced
 
 - **Type:**`object`
 
-* **`active_jobs` (required)**
+Response to a vibe check request
 
-  `integer` — Number of jobs currently being processed
+- **`active_jobs` (required)**
 
-* **`uptime` (required)**
+  `integer` — Number of jobs currently being processed (or still available for downloading job results)
+
+- **`uptime` (required)**
 
   `integer`, format: `int64` — Uptime in seconds
 
-* **`version` (required)**
+- **`version` (required)**
 
   `string` — Bansu version
 
-* **`max_queue_length`**
+- **`max_concurrent_jobs`**
+
+  `integer | null` — Max number of jobs to be run in parallel
+
+- **`max_queue_length`**
 
   `integer | null` — Max length of the queue or null if queue disabled
 
-* **`queue_length`**
+- **`queue_length`**
 
   `integer | null` — Length of the queue or null if queue disabled
 
@@ -429,7 +440,8 @@ Contains input SMILES string and an array of additional arguments passed to Aced
 
 ```
 {
-  "active_jobs": 3,
+  "active_jobs": 13,
+  "max_concurrent_jobs": 10,
   "max_queue_length": 30,
   "queue_length": 12,
   "uptime": 986986,

@@ -200,6 +200,7 @@ components:
       type: string
     VibeCheckResponse:
       type: object
+      description: Response to a vibe check request
       required:
       - version
       - active_jobs
@@ -207,7 +208,13 @@ components:
       properties:
         active_jobs:
           type: integer
-          description: Number of jobs currently being processed
+          description: Number of jobs currently being processed (or still available for downloading job results)
+          minimum: 0
+        max_concurrent_jobs:
+          type:
+          - integer
+          - 'null'
+          description: Max number of jobs to be run in parallel
           minimum: 0
         max_queue_length:
           type:
@@ -230,7 +237,8 @@ components:
           type: string
           description: Bansu version
       example:
-        active_jobs: 3
+        active_jobs: 13
+        max_concurrent_jobs: 10
         max_queue_length: 30
         queue_length: 12
         uptime: 986986
