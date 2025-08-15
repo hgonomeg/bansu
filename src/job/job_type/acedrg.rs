@@ -1,5 +1,5 @@
 use super::{Job, JobSpawnError, JobType};
-use crate::job::job_handle::{JobHandle, JobProcessConfiguration};
+use crate::job::job_handle::{JobHandle, JobHandleConfiguration, JobProcessConfiguration};
 use crate::job::job_runner::OutputKind;
 use crate::{AcedrgArgs, utils::dump_string_to_file};
 use futures_util::Future;
@@ -115,6 +115,7 @@ impl Job for AcedrgJob {
 
     fn launch<'a>(
         &'a self,
+        job_handle_configuration: JobHandleConfiguration,
         workdir_path: &'a Path,
         input_file_path: &'a Path,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<JobHandle>> + 'a>> {
@@ -130,14 +131,16 @@ impl Job for AcedrgJob {
             args.extend(commandline_args);
             args.extend_from_slice(&["-o", ACEDRG_OUTPUT_FILENAME]);
 
-            JobHandle::new(JobProcessConfiguration {
-                executable: self.executable_name(),
-                args,
-                working_dir: workdir_path
-                    .as_os_str()
-                    .to_str()
-                    .ok_or_else(|| anyhow::anyhow!("Could not convert workdir_path to UTF-8"))?,
-            })
+            JobHandle::new(
+                JobProcessConfiguration {
+                    executable: self.executable_name(),
+                    args,
+                    working_dir: workdir_path.as_os_str().to_str().ok_or_else(|| {
+                        anyhow::anyhow!("Could not convert workdir_path to UTF-8")
+                    })?,
+                },
+                job_handle_configuration,
+            )
             .await
         })
     }

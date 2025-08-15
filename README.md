@@ -261,7 +261,6 @@ Combined together gives us:
 
 ## Todo
 
-* Do not depend on setenv / getenv for spawning jobs
 * Update job output in realtime
 * Some kind of request logging for statistics
 * Some way of achieving interactivity (admin console?)

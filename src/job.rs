@@ -1,7 +1,10 @@
-use super::messages::JobId;
-use crate::ws_connection::{SetRunner, WsConnection};
+use crate::{
+    messages::JobId,
+    ws_connection::{SetRunner, WsConnection},
+};
 use actix::prelude::*;
 // use futures_util::FutureExt;
+use job_handle::JobHandleConfiguration;
 use job_runner::JobRunner;
 use job_type::{Job, JobSpawnError};
 use serde::{Deserialize, Serialize};
@@ -107,6 +110,7 @@ pub struct JobManager {
     jobs: BTreeMap<JobId, Addr<JobRunner>>,
     concurrent_jobs_semaphore: Option<Arc<Semaphore>>,
     job_queue: Option<JobQueue>,
+    job_handle_configuration: JobHandleConfiguration,
 }
 
 impl JobManager {
@@ -117,9 +121,10 @@ impl JobManager {
         perm: Option<OwnedSemaphorePermit>,
     ) -> ResponseActFuture<Self, <NewJob as actix::Message>::Result> {
         let tm = job_object.timeout_value();
+        let jh_config = self.job_handle_configuration.clone();
         Box::pin(
             async move {
-                JobRunner::try_create_job(id.clone(), job_object, perm)
+                JobRunner::try_create_job(id.clone(), job_object, perm, jh_config)
                     .await
                     .map(|addr| (id, addr))
             }
@@ -151,7 +156,8 @@ impl JobManager {
         perm: Option<OwnedSemaphorePermit>,
     ) -> Addr<JobRunner> {
         let tm = job_object.timeout_value();
-        let runner = JobRunner::create_queued_job(id.clone(), job_object, perm);
+        let jh_config = self.job_handle_configuration.clone();
+        let runner = JobRunner::create_queued_job(id.clone(), job_object, perm, jh_config);
         self.jobs.insert(id.clone(), runner.clone());
 
         // Cleanup task
@@ -368,7 +374,11 @@ impl Handler<JobManagerVibeCheck> for JobManager {
 }
 
 impl JobManager {
-    pub fn new(max_jobs: Option<usize>, max_queue_length: Option<usize>) -> Self {
+    pub fn new(
+        max_jobs: Option<usize>,
+        max_queue_length: Option<usize>,
+        jh_config: JobHandleConfiguration,
+    ) -> Self {
         log::info!("Initializing JobManager.");
         Self {
             jobs: BTreeMap::new(),
@@ -377,6 +387,7 @@ impl JobManager {
                 max_len: x,
                 data: VecDeque::new(),
             }),
+            job_handle_configuration: jh_config,
         }
     }
 }
