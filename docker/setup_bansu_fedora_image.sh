@@ -4,6 +4,7 @@ do_wget() {
   wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 "$@" || exit 7
 }
 
+ATMAN_VER=0.1.0
 LIBEIGEN_VER=3.4.0
 RDKIT_VER=2025_03_5
 GEMMI_VER=0.7.3
@@ -41,6 +42,19 @@ download_all() {
     # Servalcat
     do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz -O servalcat-${SERVALCAT_VER}.tar.gz &&\
     tar -xf servalcat-${SERVALCAT_VER}.tar.gz
+
+    # Atman
+    do_wget https://github.com/hgonomeg/atman/archive/refs/tags/v${ATMAN_VER}.tar.gz -O atman-${ATMAN_VER}.tar.gz &&\
+    tar -xf atman-${ATMAN_VER}.tar.gz
+}
+
+build_atman() {
+  setup_build_env
+  mkdir -p /build/atman
+  cd /build/atman &&\
+  rm -rf *
+  cargo install --path /download/atman-${ATMAN_VER} --root /usr --target-dir .
+  cd /build
 }
 
 build_eigen() {
@@ -109,7 +123,8 @@ build_all() {
     build_rdkit &&\
     build_gemmi &&\
     build_servalcat &&\
-    build_acedrg || exit 8
+    build_acedrg &&\
+    build_atman || exit 8
 
     # Seems to be necessary for RDKit stuff to be found at runtime
     ldconfig

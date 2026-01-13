@@ -12,6 +12,7 @@ use super::{
 };
 
 pub mod acedrg;
+pub mod atman;
 pub mod servalcat;
 
 #[derive(Error, Debug)]
@@ -50,4 +51,5 @@ pub trait Job: Send {
 pub enum JobType {
     Acedrg,
     Servalcat,
+    Atman,
 }
