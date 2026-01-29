@@ -20,6 +20,7 @@ use job::{
 };
 pub mod messages;
 use messages::*;
+pub mod usage_statistics;
 pub mod utils;
 pub mod ws_connection;
 use ws_connection::WsConnection;
