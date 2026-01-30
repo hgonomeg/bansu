@@ -7,9 +7,12 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, unique)]
     pub id: i64,
+    #[sea_orm(column_type = "Text")]
+    pub job_id: String,
     pub start_time: DateTime,
     pub processing_time: Option<i64>,
-    pub ip_address: i64,
+    #[sea_orm(column_type = "Blob")]
+    pub ip_address: Vec<u8>,
     pub successful: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub error_message: Option<String>,
