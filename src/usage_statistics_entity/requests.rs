@@ -7,13 +7,16 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
+    pub time_sent: DateTime,
     #[sea_orm(column_type = "Text")]
     pub api_route: String,
     pub successful: i64,
     pub ip_address: i64,
     pub time_to_process: i64,
     pub job_queue_len: i64,
-    pub num_of_job_running: i64,
+    pub num_of_jobs_running: i64,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub error_message: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

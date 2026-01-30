@@ -7,11 +7,12 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, unique)]
     pub id: i64,
-    #[sea_orm(ignore, column_type = "custom(\"DATETIME\")", select_as = "text")]
-    pub start_time: String,
+    pub start_time: DateTime,
     pub processing_time: Option<i64>,
     pub ip_address: i64,
     pub successful: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub error_message: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
