@@ -15,10 +15,11 @@ CREATE TABLE Requests (
 CREATE TABLE Jobs (
     id              INTEGER       PRIMARY KEY AUTOINCREMENT
                                   UNIQUE,
-    job_id          TEXT          NOT NULL,
+    job_id          TEXT,
     start_time      DATETIME_TEXT NOT NULL,
     processing_time INTEGER,
     ip_address      BLOB          NOT NULL,
     successful      INTEGER,
     error_message   TEXT
 );
+

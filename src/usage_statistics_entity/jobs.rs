@@ -7,8 +7,8 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, unique)]
     pub id: i64,
-    #[sea_orm(column_type = "Text")]
-    pub job_id: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub job_id: Option<String>,
     pub start_time: DateTime,
     pub processing_time: Option<i64>,
     #[sea_orm(column_type = "Blob")]
