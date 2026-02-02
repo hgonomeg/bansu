@@ -130,14 +130,14 @@ pub async fn finalize_job_statistics(
 
 /// Convenient struct for writing request statistics to the database
 pub struct RequestStatCommiter<'a> {
-    connection: &'a DatabaseConnection,
+    connection: DatabaseConnection,
     init_time: DateTime<Local>,
     route: &'a str,
-    ip_address: &'a IpAddr,
+    ip_address: IpAddr,
 }
 
 impl<'a> RequestStatCommiter<'a> {
-    pub fn new(connection: &'a DatabaseConnection, route: &'a str, ip_address: &'a IpAddr) -> Self {
+    pub fn new(connection: DatabaseConnection, route: &'a str, ip_address: IpAddr) -> Self {
         Self {
             connection,
             init_time: Local::now(),
@@ -176,7 +176,7 @@ impl<'a> RequestStatCommiter<'a> {
             id: NotSet,
             api_route: Set(self.route.to_string()),
             successful: Set(successful as i64),
-            ip_address: Set(ip_addr_to_blob(self.ip_address)),
+            ip_address: Set(ip_addr_to_blob(&self.ip_address)),
             time_sent: Set(self.init_time.naive_local().to_owned()),
             time_to_process: Set(time_to_process),
             job_queue_len: Set(job_queue_len),
@@ -184,7 +184,7 @@ impl<'a> RequestStatCommiter<'a> {
             error_message: Set(error_message_opt),
         };
 
-        match request.insert(self.connection).await {
+        match request.insert(&self.connection).await {
             Ok(_) => {}
             Err(e) => {
                 log::error!("Failed to commit request statistics: {}", e);

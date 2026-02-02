@@ -3,11 +3,11 @@ use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer, get,
     middleware::Condition,
-    options, /*http::StatusCode*/ post,
+    options, post,
     web::{self, Data},
 };
 use actix_ws::handle as ws_handle;
-use std::{env, sync::Arc};
+use std::{env, net::IpAddr, sync::Arc};
 #[cfg(feature = "utoipa")]
 use utoipa::OpenApi;
 pub mod job;
@@ -21,6 +21,7 @@ use job::{
 pub mod messages;
 use messages::*;
 pub mod usage_statistics;
+use usage_statistics::{FreshJobCommiter, RequestStatCommiter, finalize_job_statistics};
 pub mod usage_statistics_entity;
 pub mod utils;
 pub mod ws_connection;
@@ -279,10 +280,27 @@ async fn run_acedrg(
 async fn vibe_check(
     job_manager: web::Data<Addr<JobManager>>,
     state: web::Data<State>,
+    http_req: HttpRequest,
 ) -> HttpResponse {
+    let stats_commiter_opt = state.on_usage_stats_db(|db| {
+        let ip = http_req
+            .connection_info()
+            .realip_remote_addr()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        RequestStatCommiter::new(db.clone(), http_req.path(), ip)
+    });
     log::info!("/vibe_check - Replying to vibe check request");
     // We can safely unwrap because JobManagerVibeCheck does not fail
     let jmvc = job_manager.send(JobManagerVibeCheck).await.unwrap();
+    if let Some(commiter) = stats_commiter_opt {
+        commiter
+            .commit_successful(
+                jmvc.queue_length.unwrap_or(0) as i64,
+                jmvc.active_jobs as i64,
+            )
+            .await;
+    }
     let response = VibeCheckResponse::build(jmvc, &state);
     HttpResponse::Ok().json(response)
 }
@@ -372,7 +390,19 @@ async fn main() -> anyhow::Result<()> {
         }
     );
 
-    let state_data = Data::new(State::new(max_concurrent_jobs));
+    let usage_stats_db = match env::var("BANSU_USAGE_STATS_DB").ok() {
+        Some(db_url) => Some(
+            sea_orm::Database::connect(db_url)
+                .await
+                .with_context(|| "Could not connect to usage statistics database.")?,
+        ),
+        None => {
+            log::info!("Usage statistics database configuration not provided.");
+            None
+        }
+    };
+
+    let state_data = Data::new(State::new(max_concurrent_jobs, usage_stats_db));
     let job_manager = JobManager::new(
         max_concurrent_jobs,
         max_queue_length,
