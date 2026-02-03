@@ -7,6 +7,7 @@ use actix::prelude::*;
 use job_handle::JobHandleConfiguration;
 use job_runner::JobRunner;
 use job_type::{Job, JobSpawnError};
+use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -111,6 +112,7 @@ pub struct JobManager {
     concurrent_jobs_semaphore: Option<Arc<Semaphore>>,
     job_queue: Option<JobQueue>,
     job_handle_configuration: JobHandleConfiguration,
+    usage_stats_db: Option<DatabaseConnection>,
 }
 
 impl JobManager {
@@ -122,9 +124,10 @@ impl JobManager {
     ) -> ResponseActFuture<Self, <NewJob as actix::Message>::Result> {
         let tm = job_object.timeout_value();
         let jh_config = self.job_handle_configuration.clone();
+        let usdb = self.usage_stats_db.clone();
         Box::pin(
             async move {
-                JobRunner::try_create_job(id.clone(), job_object, perm, jh_config)
+                JobRunner::try_create_job(id.clone(), job_object, perm, jh_config, usdb)
                     .await
                     .map(|addr| (id, addr))
             }
@@ -157,7 +160,8 @@ impl JobManager {
     ) -> Addr<JobRunner> {
         let tm = job_object.timeout_value();
         let jh_config = self.job_handle_configuration.clone();
-        let runner = JobRunner::create_queued_job(id.clone(), job_object, perm, jh_config);
+        let usdb = self.usage_stats_db.clone();
+        let runner = JobRunner::create_queued_job(id.clone(), job_object, perm, jh_config, usdb);
         self.jobs.insert(id.clone(), runner.clone());
 
         // Cleanup task
@@ -378,6 +382,7 @@ impl JobManager {
         max_jobs: Option<usize>,
         max_queue_length: Option<usize>,
         jh_config: JobHandleConfiguration,
+        usage_stats_db: Option<DatabaseConnection>,
     ) -> Self {
         log::info!("Initializing JobManager.");
         Self {
@@ -388,6 +393,7 @@ impl JobManager {
                 data: VecDeque::new(),
             }),
             job_handle_configuration: jh_config,
+            usage_stats_db,
         }
     }
 }
