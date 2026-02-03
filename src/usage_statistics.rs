@@ -30,14 +30,27 @@ pub fn blob_to_ip_addr(blob: &[u8]) -> Option<IpAddr> {
 }
 
 /// Used for writing statistics for freshly created jobs
-pub struct FreshJobCommiter<'a> {
-    connection: &'a DatabaseConnection,
+pub struct FreshJobCommiter {
+    connection: DatabaseConnection,
     init_time: DateTime<Local>,
-    ip_address: &'a IpAddr,
+    ip_address: IpAddr,
 }
 
-impl<'a> FreshJobCommiter<'a> {
-    pub fn new(connection: &'a DatabaseConnection, ip_address: &'a IpAddr) -> Self {
+impl FreshJobCommiter {
+    pub fn with_state_and_request(
+        state: &State,
+        http_req: &actix_web::HttpRequest,
+    ) -> Option<Self> {
+        state.on_usage_stats_db(|db| {
+            let ip = http_req
+                .connection_info()
+                .realip_remote_addr()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+            FreshJobCommiter::new(db.clone(), ip)
+        })
+    }
+    pub fn new(connection: DatabaseConnection, ip_address: IpAddr) -> Self {
         Self {
             connection,
             init_time: Local::now(),
@@ -60,11 +73,11 @@ impl<'a> FreshJobCommiter<'a> {
             job_id: Set(job_id),
             start_time: Set(self.init_time.naive_local().to_owned()),
             processing_time: Set(processing_time_opt),
-            ip_address: Set(ip_addr_to_blob(self.ip_address)),
+            ip_address: Set(ip_addr_to_blob(&self.ip_address)),
             error_message: Set(error_message_opt),
         };
 
-        match job.insert(self.connection).await {
+        match job.insert(&self.connection).await {
             Ok(_) => {}
             Err(e) => {
                 log::error!("Failed to commit fresh job statistics: {}", e);
@@ -74,14 +87,14 @@ impl<'a> FreshJobCommiter<'a> {
 }
 
 pub async fn finalize_job_statistics(
-    connection: &DatabaseConnection,
-    job_id: &JobId,
+    connection: DatabaseConnection,
+    job_id: JobId,
     successful: bool,
     error_message_opt: Option<String>,
 ) {
     let Ok(mut db_entries) = jobs::Entity::find()
         .filter(jobs::Column::JobId.eq(job_id.to_string()))
-        .all(connection)
+        .all(&connection)
         .await
     else {
         log::error!("Failed to find job statistics entry for job ID {}", job_id);
@@ -116,7 +129,7 @@ pub async fn finalize_job_statistics(
     active_model.processing_time = Set(Some(processing_time));
     active_model.successful = Set(Some(successful as i64));
     active_model.error_message = Set(error_message_opt);
-    match active_model.update(connection).await {
+    match active_model.update(&connection).await {
         Ok(_) => {}
         Err(e) => {
             log::error!(

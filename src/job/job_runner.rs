@@ -1,7 +1,7 @@
 use super::job_handle::{JobHandle, JobHandleConfiguration};
 use super::job_type::{Job, JobSpawnError};
 use super::{JobData, JobFailureReason, JobOutput, JobStatus};
-use crate::{utils::*, ws_connection::WsConnection};
+use crate::{usage_statistics::finalize_job_statistics, utils::*, ws_connection::WsConnection};
 use actix::prelude::*;
 use anyhow::Context as AnyhowContext;
 use std::{process::Output, sync::Arc, time::Duration};
@@ -36,6 +36,7 @@ pub struct JobRunner {
     job_object: Arc<dyn Job>,
     /// Event propagation
     websocket_addrs: Vec<Addr<WsConnection>>,
+    usage_stats_db: Option<sea_orm::DatabaseConnection>,
 }
 
 impl Actor for JobRunner {
@@ -160,6 +161,17 @@ impl Handler<WorkerResult> for JobRunner {
         for i in &self.websocket_addrs {
             i.do_send(self.data.clone());
         }
+        if let Some(db_conn) = &self.usage_stats_db {
+            actix_rt::spawn(finalize_job_statistics(
+                db_conn.clone(),
+                self.id.clone(),
+                self.data.status == JobStatus::Finished,
+                match &self.data.status {
+                    JobStatus::Failed(reason) => Some(format!("{:?}", reason)),
+                    _ => None,
+                },
+            ));
+        }
     }
 }
 
@@ -246,6 +258,7 @@ impl JobRunner {
         job_object: Arc<dyn Job>,
         semaphore_permit: Option<OwnedSemaphorePermit>,
         jh_config: JobHandleConfiguration,
+        usage_stats_db: Option<sea_orm::DatabaseConnection>,
     ) -> Result<Addr<JobRunner>, JobSpawnError> {
         let (workdir, jhandle) = Self::try_init(&id, &job_object, jh_config).await?;
         let timeout_val = job_object.timeout_value();
@@ -258,6 +271,7 @@ impl JobRunner {
                 job_output: None,
             },
             websocket_addrs: vec![],
+            usage_stats_db,
         };
         Ok(JobRunner::create(|ctx: &mut Context<JobRunner>| {
             let worker =
@@ -277,6 +291,7 @@ impl JobRunner {
         job_object: Arc<dyn Job>,
         semaphore_permit: Option<OwnedSemaphorePermit>,
         jh_config: JobHandleConfiguration,
+        usage_stats_db: Option<sea_orm::DatabaseConnection>,
     ) -> Addr<JobRunner> {
         let ret = Self {
             id: id.clone(),
@@ -287,6 +302,7 @@ impl JobRunner {
                 job_output: None,
             },
             websocket_addrs: vec![],
+            usage_stats_db,
         }
         .start();
         ret.do_send(InitializeQueuedJob(semaphore_permit, jh_config));

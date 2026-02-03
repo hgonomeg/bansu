@@ -21,9 +21,7 @@ use job::{
 pub mod messages;
 use messages::*;
 pub mod usage_statistics;
-use usage_statistics::{
-    FreshJobCommiter, RequestStatCommiter, RequestStatCommiterConsumer, finalize_job_statistics,
-};
+use usage_statistics::{FreshJobCommiter, RequestStatCommiter, RequestStatCommiterConsumer};
 pub mod usage_statistics_entity;
 pub mod utils;
 pub mod ws_connection;
@@ -264,10 +262,14 @@ async fn run_acedrg(
     let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &req);
     let args = args.into_inner();
     let jo = Arc::from(AcedrgJob { args });
+    let job_commiter_opt = FreshJobCommiter::with_state_and_request(&state, &req);
 
     match job_manager.send(NewJob(jo)).await.unwrap() {
         Ok(resp) => {
             stats_commiter_opt.commit_successful(&job_manager).await;
+            if let Some(commiter) = job_commiter_opt {
+                commiter.commit_fresh_job(Some(resp.id.clone()), None).await
+            }
             match resp.entry {
                 JobEntry::Spawned(_job) => HttpResponse::Created().json(JobSpawnReply {
                     job_id: Some(resp.id),
@@ -287,6 +289,11 @@ async fn run_acedrg(
             stats_commiter_opt
                 .commit_failed(&job_manager, Some(error_msg.clone()))
                 .await;
+            if let Some(commiter) = job_commiter_opt {
+                commiter
+                    .commit_fresh_job(None, Some(error_msg.clone()))
+                    .await
+            }
             HttpResponse::BadRequest().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some(error_msg),
@@ -297,8 +304,13 @@ async fn run_acedrg(
             let error_msg = "Could not create job: Too many jobs";
             log::warn!("/run_acedrg - {}", error_msg);
             stats_commiter_opt
-                .commit_failed(&job_manager, Some(error_msg.into()))
+                .commit_failed(&job_manager, Some(error_msg.to_string()))
                 .await;
+            if let Some(commiter) = job_commiter_opt {
+                commiter
+                    .commit_fresh_job(None, Some(error_msg.to_string()))
+                    .await
+            }
             HttpResponse::ServiceUnavailable().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some("Server is at capacity. Please try again later.".to_string()),
@@ -311,6 +323,11 @@ async fn run_acedrg(
             stats_commiter_opt
                 .commit_failed(&job_manager, Some(error_msg.clone()))
                 .await;
+            if let Some(commiter) = job_commiter_opt {
+                commiter
+                    .commit_fresh_job(None, Some(error_msg.clone()))
+                    .await
+            }
             HttpResponse::InternalServerError().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some(error_msg),
@@ -447,13 +464,14 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let state_data = Data::new(State::new(max_concurrent_jobs, usage_stats_db));
+    let state_data = Data::new(State::new(max_concurrent_jobs, usage_stats_db.clone()));
     let job_manager = JobManager::new(
         max_concurrent_jobs,
         max_queue_length,
         JobHandleConfiguration {
             docker_image: docker_configuration,
         },
+        usage_stats_db,
     )
     .start();
 
