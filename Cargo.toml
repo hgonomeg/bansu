@@ -11,12 +11,12 @@ utoipa = ["dep:utoipa"]
 
 [dependencies]
 actix = "0.13"
-actix-governor = "0.8"
+actix-governor = "0.10"
 actix-rt = "2"
 actix-web = "4"
 actix-ws = "0.3"
 anyhow = "1"
-bollard = { version = "0.19", features = ["tokio-stream"] }
+bollard = { version = "0.20", features = ["tokio-stream"] }
 chrono = "0.4.43"
 # bytes = "1"
 futures-util = "0.3"
