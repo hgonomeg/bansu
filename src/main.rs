@@ -7,7 +7,7 @@ use actix_web::{
     web::{self, Data},
 };
 use actix_ws::handle as ws_handle;
-use std::{env, net::IpAddr, sync::Arc};
+use std::{env, sync::Arc};
 #[cfg(feature = "utoipa")]
 use utoipa::OpenApi;
 pub mod job;
@@ -21,7 +21,9 @@ use job::{
 pub mod messages;
 use messages::*;
 pub mod usage_statistics;
-use usage_statistics::{FreshJobCommiter, RequestStatCommiter, finalize_job_statistics};
+use usage_statistics::{
+    FreshJobCommiter, RequestStatCommiter, RequestStatCommiterConsumer, finalize_job_statistics,
+};
 pub mod usage_statistics_entity;
 pub mod utils;
 pub mod ws_connection;
@@ -58,16 +60,28 @@ struct ApiDoc;
     )
 ))]
 #[get("/get_cif/{job_id}")]
-async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>>) -> HttpResponse {
+async fn get_cif(
+    path: web::Path<JobId>,
+    job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    http_req: HttpRequest,
+) -> HttpResponse {
+    let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &http_req);
     let job_id = path.into_inner();
 
     let Some(job_entry) = job_manager.send(LookupJob(job_id.clone())).await.unwrap() else {
         log::error!("/get_cif/{} - Job not found", job_id);
+        stats_commiter_opt
+            .commit_failed(&job_manager, Some("Job not found".into()))
+            .await;
         return HttpResponse::NotFound().finish();
     };
 
     let JobEntry::Spawned(job) = job_entry else {
         log::error!("/get_cif/{} - Job is still queued.", job_id);
+        stats_commiter_opt
+            .commit_failed(&job_manager, Some("Job is still queued".into()))
+            .await;
         return HttpResponse::BadRequest().finish();
     };
 
@@ -80,15 +94,28 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
 
     match file_res {
         Err(OutputRequestError::IOError(e)) => {
-            log::error!("/get_cif/{} - Could not open output - {}", job_id, &e);
+            let error_msg = format!("Could not open output - {}", &e);
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some(error_msg.clone()))
+                .await;
+            log::error!("/get_cif/{} - {}", job_id, &error_msg);
             HttpResponse::InternalServerError().body(e.to_string())
         }
         Err(OutputRequestError::JobStillPending) => {
             log::warn!("/get_cif/{} - Job is still pending.", job_id);
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some("Job is still pending".into()))
+                .await;
             HttpResponse::BadRequest().finish()
         }
         Err(OutputRequestError::OutputKindNotSupported) => {
             log::error!("/get_cif/{} - This job does not support CIF output", job_id);
+            stats_commiter_opt
+                .commit_failed(
+                    &job_manager,
+                    Some("This job does not support CIF output".into()),
+                )
+                .await;
             HttpResponse::BadRequest().finish()
         }
         Ok(mut file) => {
@@ -115,6 +142,7 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
                 }
             });
 
+            stats_commiter_opt.commit_successful(&job_manager).await;
             HttpResponse::Ok().streaming(tokio_stream::wrappers::ReceiverStream::new(rx))
         }
     }
@@ -153,9 +181,11 @@ The connection ignores all messages sent to it (responds only to Ping messages).
 async fn job_ws(
     path: web::Path<JobId>,
     req: HttpRequest,
+    state: web::Data<State>,
     payload: web::Payload,
     job_manager: web::Data<Addr<JobManager>>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &req);
     let job_id = path.into_inner();
     let Some(job_entry) = job_manager
         .send(LookupJob(job_id.clone()))
@@ -164,6 +194,9 @@ async fn job_ws(
         .flatten()
     else {
         log::error!("/ws/{} - Job not found", job_id);
+        stats_commiter_opt
+            .commit_failed(&job_manager, Some("Job not found".into()))
+            .await;
         return Ok(HttpResponse::NotFound().finish());
     };
     let jm = job_manager.get_ref().clone();
@@ -173,6 +206,7 @@ async fn job_ws(
     };
     let (response, session, msg_stream) = ws_handle(&req, payload)?;
     WsConnection::new(jm, job_opt, job_id, session, msg_stream);
+    stats_commiter_opt.commit_successful(&job_manager).await;
     Ok(response)
 }
 
@@ -282,14 +316,7 @@ async fn vibe_check(
     state: web::Data<State>,
     http_req: HttpRequest,
 ) -> HttpResponse {
-    let stats_commiter_opt = state.on_usage_stats_db(|db| {
-        let ip = http_req
-            .connection_info()
-            .realip_remote_addr()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
-        RequestStatCommiter::new(db.clone(), http_req.path(), ip)
-    });
+    let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &http_req);
     log::info!("/vibe_check - Replying to vibe check request");
     // We can safely unwrap because JobManagerVibeCheck does not fail
     let jmvc = job_manager.send(JobManagerVibeCheck).await.unwrap();

@@ -1,5 +1,5 @@
 use super::usage_statistics_entity::{jobs, requests};
-use crate::messages::JobId;
+use crate::{messages::JobId, state::State};
 use chrono::{DateTime, Local};
 use sea_orm::{
     ActiveModelTrait,
@@ -145,6 +145,20 @@ impl<'a> RequestStatCommiter<'a> {
             ip_address,
         }
     }
+    #[inline]
+    pub fn with_state_and_request(
+        state: &'a State,
+        http_req: &'a actix_web::HttpRequest,
+    ) -> Option<Self> {
+        state.on_usage_stats_db(|db| {
+            let ip = http_req
+                .connection_info()
+                .realip_remote_addr()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+            RequestStatCommiter::new(db.clone(), http_req.path(), ip)
+        })
+    }
 
     pub async fn commit_successful(self, job_queue_len: i64, num_of_jobs_running: i64) {
         self.commit(job_queue_len, num_of_jobs_running, true, None)
@@ -189,6 +203,49 @@ impl<'a> RequestStatCommiter<'a> {
             Err(e) => {
                 log::error!("Failed to commit request statistics: {}", e);
             }
+        }
+    }
+}
+
+#[allow(async_fn_in_trait)]
+pub trait RequestStatCommiterConsumer {
+    async fn commit_successful(self, jm_addr: &actix::Addr<crate::job::JobManager>);
+    async fn commit_failed(
+        self,
+        jm_addr: &actix::Addr<crate::job::JobManager>,
+        error_message_opt: Option<String>,
+    );
+}
+
+impl RequestStatCommiterConsumer for Option<RequestStatCommiter<'_>> {
+    async fn commit_successful(self, jm_addr: &actix::Addr<crate::job::JobManager>) {
+        if let Some(commiter) = self {
+            // It should be safe to unwrap here because JobManagerVibeCheck does not fail
+            let jmvcr = jm_addr.send(crate::job::JobManagerVibeCheck).await.unwrap();
+            commiter
+                .commit_successful(
+                    jmvcr.queue_length.unwrap_or(0) as i64,
+                    jmvcr.active_jobs as i64,
+                )
+                .await;
+        }
+    }
+
+    async fn commit_failed(
+        self,
+        jm_addr: &actix::Addr<crate::job::JobManager>,
+        error_message_opt: Option<String>,
+    ) {
+        if let Some(commiter) = self {
+            // It should be safe to unwrap here because JobManagerVibeCheck does not fail
+            let jmvcr = jm_addr.send(crate::job::JobManagerVibeCheck).await.unwrap();
+            commiter
+                .commit_failed(
+                    jmvcr.queue_length.unwrap_or(0) as i64,
+                    jmvcr.active_jobs as i64,
+                    error_message_opt,
+                )
+                .await;
         }
     }
 }
