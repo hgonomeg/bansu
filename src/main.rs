@@ -258,33 +258,47 @@ async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
 async fn run_acedrg(
     args: web::Json<AcedrgArgs>,
     job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    req: HttpRequest,
 ) -> HttpResponse {
+    let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &req);
     let args = args.into_inner();
     let jo = Arc::from(AcedrgJob { args });
 
     match job_manager.send(NewJob(jo)).await.unwrap() {
-        Ok(resp) => match resp.entry {
-            JobEntry::Spawned(_job) => HttpResponse::Created().json(JobSpawnReply {
-                job_id: Some(resp.id),
-                error_message: None,
-                queue_position: None,
-            }),
-            JobEntry::Queued(queue_pos) => HttpResponse::Accepted().json(JobSpawnReply {
-                job_id: Some(resp.id),
-                error_message: None,
-                queue_position: Some(queue_pos),
-            }),
-        },
+        Ok(resp) => {
+            stats_commiter_opt.commit_successful(&job_manager).await;
+            match resp.entry {
+                JobEntry::Spawned(_job) => HttpResponse::Created().json(JobSpawnReply {
+                    job_id: Some(resp.id),
+                    error_message: None,
+                    queue_position: None,
+                }),
+                JobEntry::Queued(queue_pos) => HttpResponse::Accepted().json(JobSpawnReply {
+                    job_id: Some(resp.id),
+                    error_message: None,
+                    queue_position: Some(queue_pos),
+                }),
+            }
+        }
         Err(JobSpawnError::InputValidation(e)) => {
-            log::warn!("/run_acedrg - Could not create job: {:#}", &e);
+            let error_msg = format!("Could not create job: Input validation error - {:#}", &e);
+            log::warn!("/run_acedrg - {}", &error_msg);
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some(error_msg.clone()))
+                .await;
             HttpResponse::BadRequest().json(JobSpawnReply {
                 job_id: None,
-                error_message: Some(format!("{:#}", e)),
+                error_message: Some(error_msg),
                 queue_position: None,
             })
         }
         Err(JobSpawnError::TooManyJobs) => {
-            log::warn!("/run_acedrg - Could not create job: Too many jobs");
+            let error_msg = "Could not create job: Too many jobs";
+            log::warn!("/run_acedrg - {}", error_msg);
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some(error_msg.into()))
+                .await;
             HttpResponse::ServiceUnavailable().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some("Server is at capacity. Please try again later.".to_string()),
@@ -292,10 +306,14 @@ async fn run_acedrg(
             })
         }
         Err(JobSpawnError::Other(e)) => {
-            log::error!("/run_acedrg - Could not create job: {:#}", &e);
+            let error_msg = format!("Could not create job: {:#}", &e);
+            log::error!("/run_acedrg - {}", &error_msg);
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some(error_msg.clone()))
+                .await;
             HttpResponse::InternalServerError().json(JobSpawnReply {
                 job_id: None,
-                error_message: Some(format!("{:#}", e)),
+                error_message: Some(error_msg),
                 queue_position: None,
             })
         }
