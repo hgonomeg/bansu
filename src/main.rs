@@ -69,17 +69,21 @@ async fn get_cif(
 
     let Some(job_entry) = job_manager.send(LookupJob(job_id.clone())).await.unwrap() else {
         log::error!("/get_cif/{} - Job not found", job_id);
-        stats_commiter_opt
-            .commit_failed(&job_manager, Some("Job not found".into()))
-            .await;
+        tokio::spawn(async move {
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some("Job not found".into()))
+                .await;
+        });
         return HttpResponse::NotFound().finish();
     };
 
     let JobEntry::Spawned(job) = job_entry else {
         log::error!("/get_cif/{} - Job is still queued.", job_id);
-        stats_commiter_opt
-            .commit_failed(&job_manager, Some("Job is still queued".into()))
-            .await;
+        tokio::spawn(async move {
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some("Job is still queued".into()))
+                .await;
+        });
         return HttpResponse::BadRequest().finish();
     };
 
@@ -93,27 +97,33 @@ async fn get_cif(
     match file_res {
         Err(OutputRequestError::IOError(e)) => {
             let error_msg = format!("Could not open output - {}", &e);
-            stats_commiter_opt
-                .commit_failed(&job_manager, Some(error_msg.clone()))
-                .await;
             log::error!("/get_cif/{} - {}", job_id, &error_msg);
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some(error_msg))
+                    .await;
+            });
             HttpResponse::InternalServerError().body(e.to_string())
         }
         Err(OutputRequestError::JobStillPending) => {
             log::warn!("/get_cif/{} - Job is still pending.", job_id);
-            stats_commiter_opt
-                .commit_failed(&job_manager, Some("Job is still pending".into()))
-                .await;
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some("Job is still pending".into()))
+                    .await;
+            });
             HttpResponse::BadRequest().finish()
         }
         Err(OutputRequestError::OutputKindNotSupported) => {
             log::error!("/get_cif/{} - This job does not support CIF output", job_id);
-            stats_commiter_opt
-                .commit_failed(
-                    &job_manager,
-                    Some("This job does not support CIF output".into()),
-                )
-                .await;
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(
+                        &job_manager,
+                        Some("This job does not support CIF output".into()),
+                    )
+                    .await;
+            });
             HttpResponse::BadRequest().finish()
         }
         Ok(mut file) => {
@@ -139,8 +149,9 @@ async fn get_cif(
                     }
                 }
             });
-
-            stats_commiter_opt.commit_successful(&job_manager).await;
+            tokio::spawn(async move {
+                stats_commiter_opt.commit_successful(&job_manager).await;
+            });
             HttpResponse::Ok().streaming(tokio_stream::wrappers::ReceiverStream::new(rx))
         }
     }
@@ -192,9 +203,11 @@ async fn job_ws(
         .flatten()
     else {
         log::error!("/ws/{} - Job not found", job_id);
-        stats_commiter_opt
-            .commit_failed(&job_manager, Some("Job not found".into()))
-            .await;
+        tokio::spawn(async move {
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some("Job not found".into()))
+                .await;
+        });
         return Ok(HttpResponse::NotFound().finish());
     };
     let jm = job_manager.get_ref().clone();
@@ -204,7 +217,9 @@ async fn job_ws(
     };
     let (response, session, msg_stream) = ws_handle(&req, payload)?;
     WsConnection::new(jm, job_opt, job_id, session, msg_stream);
-    stats_commiter_opt.commit_successful(&job_manager).await;
+    tokio::spawn(async move {
+        stats_commiter_opt.commit_successful(&job_manager).await;
+    });
     Ok(response)
 }
 
@@ -260,16 +275,19 @@ async fn run_acedrg(
     req: HttpRequest,
 ) -> HttpResponse {
     let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &req);
+    let job_commiter_opt = FreshJobCommiter::with_state_and_request(&state, &req);
     let args = args.into_inner();
     let jo = Arc::from(AcedrgJob { args });
-    let job_commiter_opt = FreshJobCommiter::with_state_and_request(&state, &req);
 
     match job_manager.send(NewJob(jo)).await.unwrap() {
         Ok(resp) => {
-            stats_commiter_opt.commit_successful(&job_manager).await;
-            if let Some(commiter) = job_commiter_opt {
-                commiter.commit_fresh_job(Some(resp.id.clone()), None).await
-            }
+            let resp_id = resp.id.clone();
+            tokio::spawn(async move {
+                if let Some(commiter) = job_commiter_opt {
+                    commiter.commit_fresh_job(Some(resp_id), None).await
+                }
+                stats_commiter_opt.commit_successful(&job_manager).await;
+            });
             match resp.entry {
                 JobEntry::Spawned(_job) => HttpResponse::Created().json(JobSpawnReply {
                     job_id: Some(resp.id),
@@ -286,14 +304,15 @@ async fn run_acedrg(
         Err(JobSpawnError::InputValidation(e)) => {
             let error_msg = format!("Could not create job: Input validation error - {:#}", &e);
             log::warn!("/run_acedrg - {}", &error_msg);
-            stats_commiter_opt
-                .commit_failed(&job_manager, Some(error_msg.clone()))
-                .await;
-            if let Some(commiter) = job_commiter_opt {
-                commiter
-                    .commit_fresh_job(None, Some(error_msg.clone()))
-                    .await
-            }
+            let error_msg_c = error_msg.clone();
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some(error_msg_c.clone()))
+                    .await;
+                if let Some(commiter) = job_commiter_opt {
+                    commiter.commit_fresh_job(None, Some(error_msg_c)).await
+                }
+            });
             HttpResponse::BadRequest().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some(error_msg),
@@ -303,14 +322,17 @@ async fn run_acedrg(
         Err(JobSpawnError::TooManyJobs) => {
             let error_msg = "Could not create job: Too many jobs";
             log::warn!("/run_acedrg - {}", error_msg);
-            stats_commiter_opt
-                .commit_failed(&job_manager, Some(error_msg.to_string()))
-                .await;
-            if let Some(commiter) = job_commiter_opt {
-                commiter
-                    .commit_fresh_job(None, Some(error_msg.to_string()))
-                    .await
-            }
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some(error_msg.to_string()))
+                    .await;
+
+                if let Some(commiter) = job_commiter_opt {
+                    commiter
+                        .commit_fresh_job(None, Some(error_msg.to_string()))
+                        .await
+                }
+            });
             HttpResponse::ServiceUnavailable().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some("Server is at capacity. Please try again later.".to_string()),
@@ -320,14 +342,15 @@ async fn run_acedrg(
         Err(JobSpawnError::Other(e)) => {
             let error_msg = format!("Could not create job: {:#}", &e);
             log::error!("/run_acedrg - {}", &error_msg);
-            stats_commiter_opt
-                .commit_failed(&job_manager, Some(error_msg.clone()))
-                .await;
-            if let Some(commiter) = job_commiter_opt {
-                commiter
-                    .commit_fresh_job(None, Some(error_msg.clone()))
-                    .await
-            }
+            let error_msg_c = error_msg.clone();
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some(error_msg_c.clone()))
+                    .await;
+                if let Some(commiter) = job_commiter_opt {
+                    commiter.commit_fresh_job(None, Some(error_msg_c)).await
+                }
+            });
             HttpResponse::InternalServerError().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some(error_msg),
@@ -355,14 +378,16 @@ async fn vibe_check(
     log::info!("/vibe_check - Replying to vibe check request");
     // We can safely unwrap because JobManagerVibeCheck does not fail
     let jmvc = job_manager.send(JobManagerVibeCheck).await.unwrap();
-    if let Some(commiter) = stats_commiter_opt {
-        commiter
-            .commit_successful(
-                jmvc.queue_length.unwrap_or(0) as i64,
-                jmvc.active_jobs as i64,
-            )
-            .await;
-    }
+    tokio::spawn(async move {
+        if let Some(commiter) = stats_commiter_opt {
+            commiter
+                .commit_successful(
+                    jmvc.queue_length.unwrap_or(0) as i64,
+                    jmvc.active_jobs as i64,
+                )
+                .await;
+        }
+    });
     let response = VibeCheckResponse::build(jmvc, &state);
     HttpResponse::Ok().json(response)
 }
