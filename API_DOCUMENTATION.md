@@ -47,9 +47,13 @@ Creates `Acedrg` job.
 
   `string`
 
-- **`smiles` (required)**
+- **`input_mmcif_base64`**
 
-  `string` — Input SMILES string
+  `string | null` — Input mmCIF file content, base64-encoded
+
+- **`smiles`**
+
+  `string | null` — Input SMILES string
 
 **Example:**
 
@@ -213,13 +217,13 @@ Health check endpoint.
 
   `integer` — Number of jobs currently being processed (or still available for downloading job results)
 
-- **`uptime` (required)**
-
-  `integer`, format: `int64` — Uptime in seconds
-
 - **`bansu_version` (required)**
 
   `string` — Bansu version
+
+- **`uptime` (required)**
+
+  `integer`, format: `int64` — Uptime in seconds
 
 - **`max_concurrent_jobs`**
 
@@ -238,11 +242,11 @@ Health check endpoint.
 ```
 {
   "active_jobs": 13,
+  "bansu_version": "0.4.0",
   "max_concurrent_jobs": 10,
   "max_queue_length": 30,
   "queue_length": 12,
-  "uptime": 986986,
-  "bansu_version": "v0.4.0"
+  "uptime": 986986
 }
 ```
 
@@ -315,7 +319,7 @@ The connection ignores all messages sent to it (responds only to Ping messages).
 
 - **Type:**`object`
 
-Contains input SMILES string and an array of additional arguments passed to Acedrg.
+Contains either an input SMILES string or an input mmCIF file (base64-encoded) and an array of additional arguments passed to Acedrg.
 
 - **`commandline_args` (required)**
 
@@ -325,9 +329,13 @@ Contains input SMILES string and an array of additional arguments passed to Aced
 
   `string`
 
-- **`smiles` (required)**
+- **`input_mmcif_base64`**
 
-  `string` — Input SMILES string
+  `string | null` — Input mmCIF file content, base64-encoded
+
+- **`smiles`**
+
+  `string | null` — Input SMILES string
 
 **Example:**
 
@@ -416,13 +424,13 @@ Response to a vibe check request
 
   `integer` — Number of jobs currently being processed (or still available for downloading job results)
 
+- **`bansu_version` (required)**
+
+  `string` — Bansu version
+
 - **`uptime` (required)**
 
   `integer`, format: `int64` — Uptime in seconds
-
-- **`version` (required)**
-
-  `string` — Bansu version
 
 - **`max_concurrent_jobs`**
 
@@ -441,11 +449,11 @@ Response to a vibe check request
 ```
 {
   "active_jobs": 13,
+  "bansu_version": "0.4.0",
   "max_concurrent_jobs": 10,
   "max_queue_length": 30,
   "queue_length": 12,
-  "uptime": 986986,
-  "version": "0.4.0"
+  "uptime": 986986
 }
 ```
 

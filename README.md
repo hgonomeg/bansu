@@ -102,7 +102,10 @@ Accepts the following JSON payload:
 
 ```json5
 {
+    /// Input SMILES string (only one input should be present at a time)
     "smiles": "Your SMILES string",
+    /// Input mmCIF file, base64-encoded (only one input should be present at a time)
+    "input_mmcif_base64": ""
     /// An array of additional arguments passed to acedrg
     /// Note: not all Acedrg arguments are currently available
     "commandline_args": ["-z", "--something"]
@@ -232,6 +235,7 @@ Environment variables for the test:
 
 * `BANSU_URL` - the URL to be used for Bansu connection (default: `http://localhost:8080`)
 * `BANSU_TEST_SMILES` - SMILES string used for testing (default: `c1ccccc1`)
+* `BANSU_TEST_MMCIF` - Specifies mmCIF file name to be used as Acedrg input (instead of working with SMILES)
 * `BANSU_TEST_ACEDRG_ARGS` - Args for Acedrg (default: `[]`) This is a JSON array of commandline arguments. 
 
 Feel free to hack with the script to adjust it to your needs.

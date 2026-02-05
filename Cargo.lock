@@ -386,6 +386,7 @@ dependencies = [
  "actix-web",
  "actix-ws",
  "anyhow",
+ "base64",
  "bollard",
  "chrono",
  "futures-util",

@@ -142,26 +142,26 @@ pub async fn finalize_job_statistics(
 }
 
 /// Convenient struct for writing request statistics to the database
-pub struct RequestStatCommiter<'a> {
+pub struct RequestStatCommiter {
     connection: DatabaseConnection,
     init_time: DateTime<Local>,
-    route: &'a str,
+    route: String,
     ip_address: IpAddr,
 }
 
-impl<'a> RequestStatCommiter<'a> {
-    pub fn new(connection: DatabaseConnection, route: &'a str, ip_address: IpAddr) -> Self {
+impl RequestStatCommiter {
+    pub fn new(connection: DatabaseConnection, route: &str, ip_address: IpAddr) -> Self {
         Self {
             connection,
             init_time: Local::now(),
-            route,
+            route: route.to_string(),
             ip_address,
         }
     }
     #[inline]
     pub fn with_state_and_request(
-        state: &'a State,
-        http_req: &'a actix_web::HttpRequest,
+        state: &State,
+        http_req: &actix_web::HttpRequest,
     ) -> Option<Self> {
         state.on_usage_stats_db(|db| {
             let ip = http_req
@@ -230,7 +230,7 @@ pub trait RequestStatCommiterConsumer {
     );
 }
 
-impl RequestStatCommiterConsumer for Option<RequestStatCommiter<'_>> {
+impl RequestStatCommiterConsumer for Option<RequestStatCommiter> {
     async fn commit_successful(self, jm_addr: &actix::Addr<crate::job::JobManager>) {
         if let Some(commiter) = self {
             // It should be safe to unwrap here because JobManagerVibeCheck does not fail

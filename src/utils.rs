@@ -1,3 +1,4 @@
+use base64::prelude::*;
 use std::{
     env::temp_dir,
     future::Future,
@@ -101,6 +102,27 @@ pub async fn dump_string_to_file<P: AsRef<Path>, S: AsRef<str>>(
         .open(filepath)
         .await?;
     file.write_all(content.as_ref().as_bytes()).await?;
+    Ok(())
+}
+
+pub async fn decode_base64_to_file<P: AsRef<Path>, S: AsRef<str>>(
+    filepath: P,
+    content_base64: S,
+) -> std::io::Result<()> {
+    let decoded_content = BASE64_STANDARD
+        .decode(content_base64.as_ref())
+        .map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to decode base64 content: {}", e),
+            )
+        })?;
+    let mut file = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(filepath)
+        .await?;
+    file.write_all(&decoded_content).await?;
     Ok(())
 }
 

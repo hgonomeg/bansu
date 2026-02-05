@@ -16,6 +16,7 @@ actix-rt = "2"
 actix-web = "4"
 actix-ws = "0.3"
 anyhow = "1"
+base64 = "0.22"
 bollard = { version = "0.20", features = ["tokio-stream"] }
 chrono = "0.4.43"
 # bytes = "1"

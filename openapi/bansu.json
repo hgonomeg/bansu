@@ -187,9 +187,8 @@
     "schemas": {
       "AcedrgArgs": {
         "type": "object",
-        "description": "Contains input SMILES string and an array of additional arguments passed to Acedrg.",
+        "description": "Contains either an input SMILES string or an input mmCIF file (base64-encoded) and an array of additional arguments passed to Acedrg.",
         "required": [
-          "smiles",
           "commandline_args"
         ],
         "properties": {
@@ -200,8 +199,18 @@
             },
             "description": "Array of arguments for Acedrg . Note: not all Acedrg arguments are currently available"
           },
+          "input_mmcif_base64": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Input mmCIF file content, base64-encoded"
+          },
           "smiles": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Input SMILES string"
           }
         },
@@ -288,7 +297,7 @@
         "type": "object",
         "description": "Response to a vibe check request",
         "required": [
-          "version",
+          "bansu_version",
           "active_jobs",
           "uptime"
         ],
@@ -297,6 +306,10 @@
             "type": "integer",
             "description": "Number of jobs currently being processed (or still available for downloading job results)",
             "minimum": 0
+          },
+          "bansu_version": {
+            "type": "string",
+            "description": "Bansu version"
           },
           "max_concurrent_jobs": {
             "type": [
@@ -327,19 +340,15 @@
             "format": "int64",
             "description": "Uptime in seconds",
             "minimum": 0
-          },
-          "version": {
-            "type": "string",
-            "description": "Bansu version"
           }
         },
         "example": {
           "active_jobs": 13,
+          "bansu_version": "0.4.0",
           "max_concurrent_jobs": 10,
           "max_queue_length": 30,
           "queue_length": 12,
-          "uptime": 986986,
-          "version": "v0.4.0"
+          "uptime": 986986
         }
       },
       "WsJobDataUpdate": {
