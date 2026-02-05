@@ -4,10 +4,10 @@ do_wget() {
   wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 "$@" || exit 7
 }
 
-LIBEIGEN_VER=3.4.0
-RDKIT_VER=2025_03_5
-GEMMI_VER=0.7.3
-SERVALCAT_VER=0.4.105
+LIBEIGEN_VER=5.0.1
+RDKIT_VER=2025_09_4
+GEMMI_VER=0.7.4
+SERVALCAT_VER=0.4.131
 # ACEDRG_VER=main
 ACEDRG_VER=bzr
 
