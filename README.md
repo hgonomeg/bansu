@@ -103,6 +103,7 @@ Accepts the following JSON payload:
 ```json5
 {
     "smiles": "Your SMILES string",
+    "input_mmcif_base64": ""
     /// An array of additional arguments passed to acedrg
     /// Note: not all Acedrg arguments are currently available
     "commandline_args": ["-z", "--something"]
