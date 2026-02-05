@@ -194,12 +194,14 @@ pub struct JobSpawnReply {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[cfg_attr(feature = "utoipa", schema(
-    description = "Contains input SMILES string and an array of additional arguments passed to Acedrg.", 
+    description = "Contains either an input SMILES string or an input mmCIF file (base64-encoded) and an array of additional arguments passed to Acedrg.", 
     example = json!({"smiles": "Your SMILES string", "commandline_args": ["-z", "--something"]})
 ))]
 pub struct AcedrgArgs {
     /// Input SMILES string
-    pub smiles: String,
+    pub smiles: Option<String>,
+    /// Input mmCIF file content, base64-encoded
+    pub input_mmcif_base64: Option<String>,
     /// Array of arguments for Acedrg . Note: not all Acedrg arguments are currently available
     pub commandline_args: Vec<String>,
 }
