@@ -4,7 +4,7 @@ do_wget() {
   wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 "$@" || exit 7
 }
 
-LIBEIGEN_VER=5.0.1
+LIBEIGEN3_VER=3.4.0
 RDKIT_VER=2025_09_4
 GEMMI_VER=0.7.4
 SERVALCAT_VER=0.4.131
@@ -25,9 +25,9 @@ download_all() {
     brz checkout --light https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/ acedrg-${ACEDRG_VER} || exit 7
 
 
-    # Libeigen
-    do_wget https://gitlab.com/libeigen/eigen/-/archive/${LIBEIGEN_VER}/eigen-${LIBEIGEN_VER}.tar.gz &&\
-    tar -xf eigen-${LIBEIGEN_VER}.tar.gz
+    # Libeigen3
+    do_wget https://gitlab.com/libeigen/eigen/-/archive/${LIBEIGEN3_VER}/eigen-${LIBEIGEN3_VER}.tar.gz &&\
+    tar -xf eigen-${LIBEIGEN3_VER}.tar.gz
 
     #RDKit
     do_wget https://github.com/rdkit/rdkit/archive/refs/tags/Release_${RDKIT_VER}.tar.gz &&\
