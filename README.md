@@ -267,7 +267,6 @@ Combined together gives us:
 ## Todo
 
 * Update job output in realtime
-* Some kind of request logging for statistics
 * Some way of achieving interactivity (admin console?)
 * Graceful shutdown (finishing current jobs + what's already in the queue)
 * Maintaining a database of docker containers + temporary directories (for automatic cleanup after dirty shutdown)
