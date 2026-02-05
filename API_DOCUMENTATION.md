@@ -41,7 +41,7 @@ Creates `Acedrg` job.
 
 - **`commandline_args` (required)**
 
-  `array` — Array of arguments for Acedrg . Note: not all Acedrg arguments are currently available
+  `array` — Array of arguments for Acedrg. Note: not all Acedrg arguments are currently available
 
   **Items:**
 
@@ -49,11 +49,11 @@ Creates `Acedrg` job.
 
 - **`input_mmcif_base64`**
 
-  `string | null` — Input mmCIF file content, base64-encoded
+  `string | null` — Input mmCIF file content, base64-encoded (only one kind of input should be provided at a time)
 
 - **`smiles`**
 
-  `string | null` — Input SMILES string
+  `string | null` — Input SMILES string (only one kind of input should be provided at a time)
 
 **Example:**
 
@@ -323,7 +323,7 @@ Contains either an input SMILES string or an input mmCIF file (base64-encoded) a
 
 - **`commandline_args` (required)**
 
-  `array` — Array of arguments for Acedrg . Note: not all Acedrg arguments are currently available
+  `array` — Array of arguments for Acedrg. Note: not all Acedrg arguments are currently available
 
   **Items:**
 
@@ -331,11 +331,11 @@ Contains either an input SMILES string or an input mmCIF file (base64-encoded) a
 
 - **`input_mmcif_base64`**
 
-  `string | null` — Input mmCIF file content, base64-encoded
+  `string | null` — Input mmCIF file content, base64-encoded (only one kind of input should be provided at a time)
 
 - **`smiles`**
 
-  `string | null` — Input SMILES string
+  `string | null` — Input SMILES string (only one kind of input should be provided at a time)
 
 **Example:**
 

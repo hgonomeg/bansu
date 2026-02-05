@@ -197,21 +197,21 @@
             "items": {
               "type": "string"
             },
-            "description": "Array of arguments for Acedrg . Note: not all Acedrg arguments are currently available"
+            "description": "Array of arguments for Acedrg. Note: not all Acedrg arguments are currently available"
           },
           "input_mmcif_base64": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Input mmCIF file content, base64-encoded"
+            "description": "Input mmCIF file content, base64-encoded (only one kind of input should be provided at a time)"
           },
           "smiles": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Input SMILES string"
+            "description": "Input SMILES string (only one kind of input should be provided at a time)"
           }
         },
         "example": {

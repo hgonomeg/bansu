@@ -198,10 +198,10 @@ pub struct JobSpawnReply {
     example = json!({"smiles": "Your SMILES string", "commandline_args": ["-z", "--something"]})
 ))]
 pub struct AcedrgArgs {
-    /// Input SMILES string
+    /// Input SMILES string (only one kind of input should be provided at a time)
     pub smiles: Option<String>,
-    /// Input mmCIF file content, base64-encoded
+    /// Input mmCIF file content, base64-encoded (only one kind of input should be provided at a time)
     pub input_mmcif_base64: Option<String>,
-    /// Array of arguments for Acedrg . Note: not all Acedrg arguments are currently available
+    /// Array of arguments for Acedrg. Note: not all Acedrg arguments are currently available
     pub commandline_args: Vec<String>,
 }
