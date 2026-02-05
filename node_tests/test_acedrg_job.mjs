@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import * as https from 'https';
 import * as http from 'http';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 
 function get_addr_port_path_and_protocol() {
   const url = new URL(process.env.BANSU_URL ? process.env.BANSU_URL : "http://localhost:8080");
@@ -20,10 +21,31 @@ function get_addr_port_path_and_protocol() {
 const { addr, m_path, port, protocol } = get_addr_port_path_and_protocol();
 console.log(`Using protocol: ${protocol.replace(':', '')}, address: ${addr}, path: ${m_path}, port: ${port}`);
 
-const postData = JSON.stringify({
-  'smiles': process.env.BANSU_TEST_SMILES ? process.env.BANSU_TEST_SMILES : 'c1ccccc1',
-  'commandline_args': process.env.BANSU_TEST_ACEDRG_ARGS ? eval(process.env.BANSU_TEST_ACEDRG_ARGS) : []
-});
+function make_post_data() {
+  if (process.env.BANSU_TEST_MMCIF) {
+    // check if CIF file exists and is not empty
+    if (fs.existsSync(process.env.BANSU_TEST_MMCIF) && fs.statSync(process.env.BANSU_TEST_MMCIF).size > 0) {
+      // read and base64-encode mmCIF file
+      const mmcif_data = fs.readFileSync(process.env.BANSU_TEST_MMCIF, { encoding: 'utf-8' });
+      console.log(`Using mmCIF file: ${process.env.BANSU_TEST_MMCIF} as input, length: ${mmcif_data.length}`);
+      const mmcif_base64 = Buffer.from(mmcif_data).toString('base64');
+      return JSON.stringify({
+        'input_mmcif_base64': mmcif_base64,
+        'commandline_args': process.env.BANSU_TEST_ACEDRG_ARGS ? eval(process.env.BANSU_TEST_ACEDRG_ARGS) : []
+      });
+
+    } else {
+      // We are using SMILES for testing.
+      return JSON.stringify({
+        'smiles': process.env.BANSU_TEST_SMILES ? process.env.BANSU_TEST_SMILES : 'c1ccccc1',
+        'commandline_args': process.env.BANSU_TEST_ACEDRG_ARGS ? eval(process.env.BANSU_TEST_ACEDRG_ARGS) : []
+      });
+
+    }
+  }
+}
+
+const postData = make_post_data();
 
 const options = {
   hostname: addr,
