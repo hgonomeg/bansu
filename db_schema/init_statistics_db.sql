@@ -1,3 +1,6 @@
+-- This is a SQLite initialization script for the statistics database.
+-- Use "migrations" if possible, instead of this
+
 CREATE TABLE Requests (
     id                  INTEGER       PRIMARY KEY AUTOINCREMENT
                                       NOT NULL,

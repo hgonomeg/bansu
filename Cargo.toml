@@ -5,6 +5,10 @@ authors = ["Jakub Smulski <hgonomeg@gmail.com>"]
 edition = "2024"
 license = "GNU GPLv3"
 
+[workspace]
+members = [".", "db_schema/migrations"]
+
+
 [features]
 default = ["utoipa"]
 utoipa = ["dep:utoipa"]
