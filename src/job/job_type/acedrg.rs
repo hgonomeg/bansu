@@ -231,13 +231,13 @@ impl Job for AcedrgJob {
                         }
                         Ok(response)
                     };
-                    let max_retries = 5;
+                    let max_retries = 3;
                     let mut retries = 0;
                     let response = loop {
                         match try_fetch().await {
                             Err(e) => {
                                 retries += 1;
-                                if retries == max_retries {
+                                if retries + 1 == max_retries {
                                     return Err(std::io::Error::new(
                                         std::io::ErrorKind::Other,
                                         format!(
