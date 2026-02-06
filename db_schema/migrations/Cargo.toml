@@ -19,6 +19,6 @@ features = [
     # e.g.
     # "runtime-tokio-rustls",  # `ASYNC_RUNTIME` feature
     # "sqlx-postgres",         # `DATABASE_DRIVER` feature
-    "macros", "sqlx-all", "runtime-tokio"
+    "sqlx-all", "runtime-tokio"
 ]
 version = "2.0.0-rc"
