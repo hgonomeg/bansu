@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use sea_orm_migration::{prelude::*, schema::*};
 
 #[derive(DeriveMigrationName)]
@@ -25,9 +26,10 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new("time_to_process").integer().not_null())
                     .col(ColumnDef::new("job_queue_len").integer().not_null())
                     .col(ColumnDef::new("num_of_jobs_running").integer().not_null())
-                    .col(ColumnDef::new("error_message").text()),
+                    .col(ColumnDef::new("error_message").text())
+                    .to_owned(),
             )
-            .await;
+            .await?;
 
         manager
             .create_table(
@@ -39,15 +41,15 @@ impl MigrationTrait for Migration {
                             .integer()
                             .not_null()
                             .auto_increment()
-                            .primary_key()
-                            .unique(),
+                            .primary_key(), // .unique_key(),
                     )
                     .col(ColumnDef::new("job_id").text())
                     .col(ColumnDef::new("start_time").date_time().not_null())
                     .col(ColumnDef::new("processing_time").integer())
                     .col(ColumnDef::new("ip_address").binary().not_null())
                     .col(ColumnDef::new("successful").integer())
-                    .col(ColumnDef::new("error_message").text()),
+                    .col(ColumnDef::new("error_message").text())
+                    .to_owned(),
             )
             .await
     }
