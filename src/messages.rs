@@ -202,6 +202,8 @@ pub struct AcedrgArgs {
     pub smiles: Option<String>,
     /// Input mmCIF file content, base64-encoded (only one kind of input should be provided at a time)
     pub input_mmcif_base64: Option<String>,
+    /// CCD code for fetching the input structure from the PDBe (only one kind of input should be provided at a time)
+    pub ccd_code: Option<String>,
     /// Array of arguments for Acedrg. Note: not all Acedrg arguments are currently available
     pub commandline_args: Vec<String>,
 }

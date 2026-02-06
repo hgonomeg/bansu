@@ -47,6 +47,10 @@ Creates `Acedrg` job.
 
   `string`
 
+- **`ccd_code`**
+
+  `string | null` — CCD code for fetching the input structure from the PDBe (only one kind of input should be provided at a time)
+
 - **`input_mmcif_base64`**
 
   `string | null` — Input mmCIF file content, base64-encoded (only one kind of input should be provided at a time)
@@ -328,6 +332,10 @@ Contains either an input SMILES string or an input mmCIF file (base64-encoded) a
   **Items:**
 
   `string`
+
+- **`ccd_code`**
+
+  `string | null` — CCD code for fetching the input structure from the PDBe (only one kind of input should be provided at a time)
 
 - **`input_mmcif_base64`**
 
