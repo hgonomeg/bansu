@@ -238,6 +238,7 @@ Environment variables for the test:
 * `BANSU_URL` - the URL to be used for Bansu connection (default: `http://localhost:8080`)
 * `BANSU_TEST_SMILES` - SMILES string used for testing (default: `c1ccccc1`)
 * `BANSU_TEST_MMCIF` - Specifies mmCIF file name to be used as Acedrg input (instead of working with SMILES)
+* `BANSU_TEST_CCD_CODE` - Specifies CCD code to be fetched and used as Acedrg input (instead of working with SMILES or an mmCIF file)
 * `BANSU_TEST_ACEDRG_ARGS` - Args for Acedrg (default: `[]`) This is a JSON array of commandline arguments. 
 
 Feel free to hack with the script to adjust it to your needs.

@@ -35,13 +35,23 @@ function make_post_data() {
       });
 
     } else {
-      // We are using SMILES for testing.
-      return JSON.stringify({
-        'smiles': process.env.BANSU_TEST_SMILES ? process.env.BANSU_TEST_SMILES : 'c1ccccc1',
-        'commandline_args': process.env.BANSU_TEST_ACEDRG_ARGS ? eval(process.env.BANSU_TEST_ACEDRG_ARGS) : []
-      });
-
+      console.error(`CIF file ${process.env.BANSU_TEST_MMCIF} does not exist or is empty.`);
+      process.exit(7);
     }
+  } else if (process.env.BANSU_TEST_CCD_CODE) {
+    // We are using CCD code for testing.
+    let ret = JSON.stringify({
+      'ccd_code': process.env.BANSU_TEST_CCD_CODE,
+      'commandline_args': process.env.BANSU_TEST_ACEDRG_ARGS ? eval(process.env.BANSU_TEST_ACEDRG_ARGS) : []
+    });
+    return ret;
+  } else {
+    // We are using SMILES for testing.
+    return JSON.stringify({
+      'smiles': process.env.BANSU_TEST_SMILES ? process.env.BANSU_TEST_SMILES : 'c1ccccc1',
+      'commandline_args': process.env.BANSU_TEST_ACEDRG_ARGS ? eval(process.env.BANSU_TEST_ACEDRG_ARGS) : []
+    });
+
   }
 }
 

@@ -206,6 +206,8 @@ impl Job for AcedrgJob {
                     "https://www.ebi.ac.uk/pdbe/static/files/pdbechem_v2/{}.cif",
                     ccd_code
                 );
+                log::info!("Fetching CCD data from PDBe for CCD code '{}'...", ccd_code);
+                let init_time = std::time::Instant::now();
                 Box::pin(async move {
                     let try_fetch = || async {
                         let run_reqwest_result = async {
@@ -256,9 +258,17 @@ impl Job for AcedrgJob {
                         }
                     };
                     let reader = response.bytes_stream();
-                    byte_stream_to_file(&ccd_file_path, reader)
+                    let ret = byte_stream_to_file(&ccd_file_path, reader)
                         .await
-                        .map(|_nothing| ccd_file_path)
+                        .map(|_nothing| {
+                            log::info!(
+                                "Fetched CIF from PDBe for CCD code '{}' in {}ms",
+                                ccd_code,
+                                (std::time::Instant::now() - init_time).as_millis()
+                            );
+                            ccd_file_path
+                        });
+                    ret
                 })
             }
             _ => unreachable!("Input validation should have prevented this case"),
