@@ -105,7 +105,9 @@ Accepts the following JSON payload:
     /// Input SMILES string (only one input should be present at a time)
     "smiles": "Your SMILES string",
     /// Input mmCIF file, base64-encoded (only one input should be present at a time)
-    "input_mmcif_base64": ""
+    "input_mmcif_base64": "",
+    /// CCD code for fetching the input structure from the PDBe (only one input should be present at a time)
+    "ccd_code": "ALA",
     /// An array of additional arguments passed to acedrg
     /// Note: not all Acedrg arguments are currently available
     "commandline_args": ["-z", "--something"]

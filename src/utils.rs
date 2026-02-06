@@ -1,4 +1,5 @@
 use base64::prelude::*;
+use futures_util::StreamExt;
 use std::{
     env::temp_dir,
     future::Future,
@@ -123,6 +124,30 @@ pub async fn decode_base64_to_file<P: AsRef<Path>, S: AsRef<str>>(
         .open(filepath)
         .await?;
     file.write_all(&decoded_content).await?;
+    Ok(())
+}
+
+pub async fn byte_stream_to_file<
+    P: AsRef<Path>,
+    S: futures_util::Stream<Item = reqwest::Result<bytes::Bytes>> + Unpin,
+>(
+    filepath: P,
+    mut stream: S,
+) -> std::io::Result<()> {
+    let mut file = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(filepath)
+        .await?;
+    while let Some(chunk_result) = stream.next().await {
+        let chunk = chunk_result.map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to read from byte stream: {}", e),
+            )
+        })?;
+        file.write_all(&chunk).await?;
+    }
     Ok(())
 }
 

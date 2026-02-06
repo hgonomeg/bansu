@@ -136,6 +136,11 @@ components:
       required:
       - commandline_args
       properties:
+        ccd_code:
+          type:
+          - string
+          - 'null'
+          description: CCD code for fetching the input structure from the PDBe (only one kind of input should be provided at a time)
         commandline_args:
           type: array
           items:

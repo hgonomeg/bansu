@@ -3,7 +3,7 @@ use crate::job::job_handle::{JobHandle, JobHandleConfiguration, JobProcessConfig
 use crate::job::job_runner::OutputKind;
 use crate::{
     AcedrgArgs,
-    utils::{decode_base64_to_file, dump_string_to_file},
+    utils::{byte_stream_to_file, decode_base64_to_file, dump_string_to_file},
 };
 use futures_util::Future;
 use std::env;
@@ -55,14 +55,26 @@ impl Job for AcedrgJob {
     }
 
     fn validate_input(&self) -> Result<(), JobSpawnError> {
-        if self.args.smiles.is_none() && self.args.input_mmcif_base64.is_none() {
+        // match (
+        //     &self.args.ccd_code,
+        //     &self.args.smiles,
+        //     &self.args.input_mmcif_base64,
+        // ) {
+        //     (None, None, None) => {
+        //         return Err(JobSpawnError::InputValidation(
+        //             "Input validation failed! Either a SMILES string, an mmCIF file (base64-encoded), or a CCD code must be provided.".to_string(),
+        //         ));
+        //     }
+        //     _ => {}
+        // }
+        let sum: u16 = std::iter::once(&self.args.ccd_code)
+            .chain(std::iter::once(&self.args.smiles))
+            .chain(std::iter::once(&self.args.input_mmcif_base64))
+            .map(|x| x.is_some() as u16)
+            .sum();
+        if sum != 1 {
             return Err(JobSpawnError::InputValidation(
-                "Input validation failed! Either a SMILES string or an mmCIF file (base64-encoded) must be provided.".to_string(),
-            ));
-        }
-        if self.args.smiles.is_some() && self.args.input_mmcif_base64.is_some() {
-            return Err(JobSpawnError::InputValidation(
-                "Input validation failed! Both SMILES string and mmCIF file were provided. Use only one of them at a time.".to_string(),
+                "Input validation failed! Exactly one of the following must be provided: SMILES string, mmCIF file (base64-encoded), or CCD code.".to_string(),
             ));
         }
         // to consider: --bsu, --bsl, --asu, --asl, --res (alias to -r), --numInitConf, --multiconf, --numOptmStep
@@ -167,8 +179,12 @@ impl Job for AcedrgJob {
         &'a self,
         workdir_path: &'a Path,
     ) -> Pin<Box<dyn Future<Output = std::io::Result<PathBuf>> + 'a>> {
-        match (&self.args.smiles, &self.args.input_mmcif_base64) {
-            (Some(input_content), None) => {
+        match (
+            &self.args.smiles,
+            &self.args.input_mmcif_base64,
+            &self.args.ccd_code,
+        ) {
+            (Some(input_content), None, None) => {
                 let smiles_file_path = workdir_path.join("acedrg_smiles_input");
                 Box::pin(async move {
                     dump_string_to_file(&smiles_file_path, input_content)
@@ -176,7 +192,7 @@ impl Job for AcedrgJob {
                         .map(|_nothing| smiles_file_path)
                 })
             }
-            (None, Some(input_mmcif_base64)) => {
+            (None, Some(input_mmcif_base64), None) => {
                 let mmcif_file_path = workdir_path.join("acedrg_mmcif_input.cif");
                 Box::pin(async move {
                     decode_base64_to_file(&mmcif_file_path, input_mmcif_base64)
@@ -184,12 +200,74 @@ impl Job for AcedrgJob {
                         .map(|_nothing| mmcif_file_path)
                 })
             }
-            _ => Box::pin(async {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "Invalid input: either SMILES or mmCIF must be provided, but not both.",
-                ))
-            }),
+            (None, None, Some(ccd_code)) => {
+                let ccd_file_path = workdir_path.join("acedrg_ccd_input.cif");
+                let url = format!(
+                    "https://www.ebi.ac.uk/pdbe/static/files/pdbechem_v2/{}.cif",
+                    ccd_code
+                );
+                Box::pin(async move {
+                    let try_fetch = || async {
+                        let run_reqwest_result = async {
+                            let client = reqwest::Client::builder()
+                                .user_agent(concat!("Bansu/", env!("CARGO_PKG_VERSION")))
+                                .https_only(true)
+                                .timeout(std::time::Duration::from_secs(10))
+                                .build()?;
+                            let response = client.get(&url).send().await?;
+                            Ok(response)
+                        };
+                        let response = run_reqwest_result.await.map_err(|e: reqwest::Error| {
+                            std::io::Error::new(std::io::ErrorKind::Other, e)
+                        })?;
+                        if !response.status().is_success() {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                format!(
+                                    "Failed to fetch CCD data from PDBe. HTTP status: {}",
+                                    response.status()
+                                ),
+                            ));
+                        }
+                        Ok(response)
+                    };
+                    let max_retries = 3;
+                    let mut retries = 0;
+                    let response = loop {
+                        match try_fetch().await {
+                            Err(e) => {
+                                retries += 1;
+                                if retries + 1 == max_retries {
+                                    return Err(std::io::Error::new(
+                                        std::io::ErrorKind::Other,
+                                        format!(
+                                            "Failed to fetch CCD data after {} attempts: {}",
+                                            retries, e
+                                        ),
+                                    ));
+                                }
+                                log::warn!(
+                                    "Attempt {}: Failed to fetch CCD data: {}. Retrying...",
+                                    retries,
+                                    e
+                                );
+                            }
+                            Ok(resp) => break resp,
+                        }
+                    };
+                    let reader = response.bytes_stream();
+                    byte_stream_to_file(&ccd_file_path, reader)
+                        .await
+                        .map(|_nothing| ccd_file_path)
+                })
+            }
+            _ => unreachable!("Input validation should have prevented this case"),
+            // _ => Box::pin(async {
+            //     Err(std::io::Error::new(
+            //         std::io::ErrorKind::InvalidInput,
+            //         "Invalid input: either SMILES, CCD code or mmCIF must be provided, but not more than one at the same time.",
+            //     ))
+            // }),
         }
     }
 }
