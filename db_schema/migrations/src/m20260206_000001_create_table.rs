@@ -22,7 +22,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new("time_sent").date_time().not_null())
                     .col(ColumnDef::new("api_route").text().not_null())
                     .col(ColumnDef::new("successful").integer().not_null())
-                    .col(ColumnDef::new("ip_address").binary().not_null())
+                    .col(ColumnDef::new("ip_address").binary_len(16).not_null())
                     .col(ColumnDef::new("time_to_process").integer().not_null())
                     .col(ColumnDef::new("job_queue_len").integer().not_null())
                     .col(ColumnDef::new("num_of_jobs_running").integer().not_null())
@@ -46,7 +46,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new("job_id").text())
                     .col(ColumnDef::new("start_time").date_time().not_null())
                     .col(ColumnDef::new("processing_time").integer())
-                    .col(ColumnDef::new("ip_address").binary().not_null())
+                    .col(ColumnDef::new("ip_address").binary_len(16).not_null())
                     .col(ColumnDef::new("successful").integer())
                     .col(ColumnDef::new("error_message").text())
                     .to_owned(),
