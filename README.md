@@ -55,8 +55,8 @@ The following environment variables control the behavior of the server:
 * `BANSU_ACEDRG_TIMEOUT` - specifies timeout for Acedrg (in seconds) (`120` by default)
 * `BANSU_MAX_CONCURRENT_JOBS` - specifies the maximum number of jobs running in parallel (`20` by default). Use `0` to disable limit.
 * `BANSU_MAX_JOB_QUEUE_LENGTH` - specifies the maximum number of jobs waiting in queue to be processed. (`20` by default). Use `0` to disable job queueing.
-* `BANSU_RATELIMIT_BURST_SIZE` - specifis [burst size for rate limiter](https://docs.rs/actix-governor/0.10.4/actix_governor/struct.GovernorConfigBuilder.html#method.burst_size) (per IP address; `45` by default)
-* `BANSU_RATELIMIT_SECONDS_PER_REQUEST` - specifies the [interval (in seconds) after which the rate limiter replenishes quota element](https://docs.rs/actix-governor/0.10.4/actix_governor/struct.GovernorConfigBuilder.html#method.seconds_per_request) (`10` by default). Divide 60 by this number to arrive at requests per minute per IP address.
+* `BANSU_RATELIMIT_BURST_SIZE` - specifis [burst size for rate limiter](https://docs.rs/actix-governor/0.10.0/actix_governor/struct.GovernorConfigBuilder.html#method.burst_size) (per IP address; `45` by default)
+* `BANSU_RATELIMIT_SECONDS_PER_REQUEST` - specifies the [interval (in seconds) after which the rate limiter replenishes quota element](https://docs.rs/actix-governor/0.10.0/actix_governor/struct.GovernorConfigBuilder.html#method.seconds_per_request) (`10` by default). Divide 60 by this number to arrive at requests per minute per IP address.
 * `BANSU_DISABLE_RATELIMIT` - can be set to disable rate-limiting of requests. (For testing only)
 * `BANSU_DISABLE_APIDOC` - Disable json/yaml OpenAPI documentation at `/api-docs/openapi.json`
 * `BANSU_USAGE_STATS_DB` - Sets the DB connection ([as defined here](https://www.sea-ql.org/SeaORM/docs/install-and-config/connection/)) used for storing usage data (Not used by default)
