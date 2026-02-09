@@ -8,7 +8,7 @@ info:
   license:
     name: GNU GPLv3
     identifier: GNU GPLv3
-  version: 0.4.0
+  version: 0.4.1
 paths:
   /get_cif/{job_id}:
     get:
