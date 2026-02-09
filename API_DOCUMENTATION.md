@@ -1,7 +1,7 @@
 # Bansu
 
 - **OpenAPI Version:** `3.1.0`
-- **API Version:** `0.4.0-alpha`
+- **API Version:** `0.4.0`
 
 Server-side computation API for Moorhen
 

@@ -11,7 +11,7 @@
       "name": "GNU GPLv3",
       "identifier": "GNU GPLv3"
     },
-    "version": "0.4.0-alpha"
+    "version": "0.4.0"
   },
   "paths": {
     "/get_cif/{job_id}": {
