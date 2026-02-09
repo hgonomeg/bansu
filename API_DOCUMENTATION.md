@@ -1,7 +1,7 @@
 # Bansu
 
 - **OpenAPI Version:** `3.1.0`
-- **API Version:** `0.4.0`
+- **API Version:** `0.5.0-alpha`
 
 Server-side computation API for Moorhen
 
@@ -246,7 +246,7 @@ Health check endpoint.
 ```
 {
   "active_jobs": 13,
-  "bansu_version": "0.4.0",
+  "bansu_version": "0.5.0",
   "max_concurrent_jobs": 10,
   "max_queue_length": 30,
   "queue_length": 12,
@@ -457,7 +457,7 @@ Response to a vibe check request
 ```
 {
   "active_jobs": 13,
-  "bansu_version": "0.4.0",
+  "bansu_version": "0.5.0",
   "max_concurrent_jobs": 10,
   "max_queue_length": 30,
   "queue_length": 12,

@@ -89,7 +89,7 @@ Returns the following JSON:
 ```json5
 {
     /// Bansu version
-    "bansu_version": "0.4.0",
+    "bansu_version": "0.5.0",
     /// Current length of the queue or null if queue disabled
     "queue_length": 12,
     /// Max length of the queue or null if queue disabled

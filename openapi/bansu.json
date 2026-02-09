@@ -11,7 +11,7 @@
       "name": "GNU GPLv3",
       "identifier": "GNU GPLv3"
     },
-    "version": "0.4.0"
+    "version": "0.5.0-alpha"
   },
   "paths": {
     "/get_cif/{job_id}": {
@@ -351,7 +351,7 @@
         },
         "example": {
           "active_jobs": 13,
-          "bansu_version": "0.4.0",
+          "bansu_version": "0.5.0",
           "max_concurrent_jobs": 10,
           "max_queue_length": 30,
           "queue_length": 12,

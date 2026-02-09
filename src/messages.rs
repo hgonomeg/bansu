@@ -12,7 +12,7 @@ pub type JobId = String;
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[cfg_attr(feature = "utoipa", schema(example = json!({
-    "bansu_version": "0.4.0",
+    "bansu_version": "0.5.0",
     "queue_length": 12,
     "max_queue_length": 30,
     "active_jobs": 13,
