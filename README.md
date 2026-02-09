@@ -28,11 +28,24 @@ All data is deleted after job's ID becomes invalid i.e. expires.
 
 ### Security
 
-All data (temporary directories with all artifacts) is automatically deleted after job's ID becomes invalid.
-Whomever has the ID, can access your data. Treat the ID as both an identifier and a security token.
+#### Data management
+
+All data (temporary directories with all artifacts) is automatically deleted after job's ID becomes invalid / expires.
+Whomever has the ID, can access your data (for as long as the ID remains valid). Treat the ID as both an identifier and a security token.
 
 Keep in mind that not sharing your ID token does not prevent the server administrator from being able to see your data.
 For maximum data security, you may want to run your own instance of Bansu.
+
+Depending on whether the server administrator enabled usage statistics collection, some data may be stored for longer than the ID expiration period. This includes:
+
+* Time of making requests
+* IP address
+* success / failure information
+* processing time
+
+Any job details (CIF files, SMILES strings, Acedrg output etc.) are not permanently stored by the server.
+
+#### Isolation of jobs
 
 For security reasons, the server also supports running jobs
 in Docker containers which is the recommended thing to do.
@@ -198,7 +211,10 @@ Just use:
 
 No special compile-time dependencies are needed.
 
-There is one optional runtime dependency: Docker.
+There are two optional runtime dependencies: 
+
+* Docker (for job isolation)
+* A database implementation (Sqlite3 / MySQL / PostgresDB; for collection of usage statistics)
 
 The server manages docker containers (as described above in the security section).
 It needs to have adequate permissions in order to do that.
@@ -209,7 +225,7 @@ If you do not want to make use of Docker support, make sure that `acedrg` and `s
 
 ### Docker container setup
 
-A `Dockerfile` is included to build a suitable Docker container image.
+A `Dockerfile` (`FedoraDockerfile`) is included to build a suitable Docker container image.
 The image is based on Fedora but can be used on any distribution.
 
 In order to build it:
@@ -217,6 +233,20 @@ In order to build it:
 1. Go to `docker/`
 2. Run `docker build --pull --network host -t <name_of_your_image> -f FedoraDockerfile .`
 3. Wait for the image to be built.
+
+Please test your Docker images before using them in production.
+The script pulls Acedrg source code as is. It sometimes unfortunately happens that Acedrg developers push broken versions.
+
+#### Usage statistics database setup
+
+Navigate to `db_schema/migrations`.
+There you will find a SeaORM-powered utility to setup your database for collecting usage statistics.
+
+Usage:
+
+`$ cargo run -p migration -- -u <your_database_url>`
+
+Database URL format is the same as used by `BANSU_USAGE_STATS_DB`.
 
 #### Docker UID & permissions
 
