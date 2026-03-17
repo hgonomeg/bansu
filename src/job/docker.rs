@@ -6,7 +6,7 @@ use bollard::{
         AttachContainerOptions, CreateContainerOptionsBuilder, StartContainerOptions,
         WaitContainerOptions,
     },
-    secret::{ContainerWaitExitError, ContainerWaitResponse, HostConfig, Mount, MountTypeEnum},
+    models::{ContainerWaitExitError, ContainerWaitResponse, HostConfig, Mount, MountTypeEnum},
 };
 use futures_util::StreamExt;
 use uuid::Uuid;
