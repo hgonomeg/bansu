@@ -30,9 +30,9 @@ impl Job for Atman {
     }
 
     fn launch<'a>(
-        &'a self,
-        _workdir_path: &'a std::path::Path,
-        _input_file_path: &'a std::path::Path,
+        _job_handle_configuration: JobHandleConfiguration,
+        _workdir_path: &'a Path,
+        _input_file_path: &'a Path
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<JobHandle>> + 'a>> {
         todo!()
     }
