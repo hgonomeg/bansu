@@ -1,5 +1,5 @@
 use super::{Job, JobSpawnError, JobType};
-use crate::job::{job_handle::JobHandle, job_runner::OutputKind};
+use crate::job::{job_handle::JobHandle, job_runner::OutputKind, JobHandleConfiguration};
 use std::{
     future::Future,
     path::{Path, PathBuf},
@@ -30,6 +30,7 @@ impl Job for Atman {
     }
 
     fn launch<'a>(
+        &'a self,
         _job_handle_configuration: JobHandleConfiguration,
         _workdir_path: &'a Path,
         _input_file_path: &'a Path
