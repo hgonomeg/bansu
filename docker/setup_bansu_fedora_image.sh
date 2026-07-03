@@ -54,7 +54,9 @@ build_atman() {
   mkdir -p /build/atman
   cd /build/atman &&\
   rm -rf *
-  cargo install --path /download/atman-${ATMAN_VER} --root /usr --target-dir .
+  g++ /download/atman-${ATMAN_VER}/Pauls_COD_stuff/cod_db.cpp -o cod_db -std=c++17 -O3 -lsqlite3 &&\
+  install -m 755 cod_db /usr/bin/cod_db &&\
+  install -m 755 /download/atman-${ATMAN_VER}/Pauls_COD_stuff/cod_bridge.py /usr/bin/atman.py || exit 8
   cd /build
 }
 
