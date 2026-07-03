@@ -29,24 +29,24 @@ download_all() {
 
     # Libeigen
     do_wget https://gitlab.com/libeigen/eigen/-/archive/${LIBEIGEN_VER}/eigen-${LIBEIGEN_VER}.tar.gz &&\
-    tar -xf eigen-${LIBEIGEN_VER}.tar.gz
+    tar -xf eigen-${LIBEIGEN_VER}.tar.gz || exit 7
 
     #RDKit
     do_wget https://github.com/rdkit/rdkit/archive/refs/tags/Release_${RDKIT_VER}.tar.gz &&\
     tar -xf Release_${RDKIT_VER}.tar.gz &&\
-    mv rdkit-Release_${RDKIT_VER} RDKit_${RDKIT_VER}
+    mv rdkit-Release_${RDKIT_VER} RDKit_${RDKIT_VER} || exit 7
 
     #GEMMI
     do_wget https://github.com/project-gemmi/gemmi/archive/refs/tags/v${GEMMI_VER}.tar.gz -O gemmi-${GEMMI_VER}.tar.gz &&\
-    tar -xf gemmi-${GEMMI_VER}.tar.gz
+    tar -xf gemmi-${GEMMI_VER}.tar.gz || exit 7
 
     # Servalcat
     do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz -O servalcat-${SERVALCAT_VER}.tar.gz &&\
-    tar -xf servalcat-${SERVALCAT_VER}.tar.gz
+    tar -xf servalcat-${SERVALCAT_VER}.tar.gz || exit 7
 
     # Atman
     do_wget https://github.com/hgonomeg/atman/archive/refs/tags/v${ATMAN_VER}.tar.gz -O atman-${ATMAN_VER}.tar.gz &&\
-    tar -xf atman-${ATMAN_VER}.tar.gz
+    tar -xf atman-${ATMAN_VER}.tar.gz || exit 7
 }
 
 build_atman() {
