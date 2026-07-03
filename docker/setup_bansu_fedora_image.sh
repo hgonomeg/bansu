@@ -5,10 +5,11 @@ do_wget() {
 }
 
 ATMAN_VER=0.1.0
+# Currently, gemmi build fails if we use anything newer than eigen 3
 LIBEIGEN_VER=3.4.0
-RDKIT_VER=2025_03_5
-GEMMI_VER=0.7.3
-SERVALCAT_VER=0.4.105
+RDKIT_VER=2025_09_4
+GEMMI_VER=0.7.4
+SERVALCAT_VER=0.4.131
 # ACEDRG_VER=main
 ACEDRG_VER=bzr
 

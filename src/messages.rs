@@ -1,9 +1,52 @@
-use crate::job::{JobFailureReason, JobOutput, JobStatus};
+use crate::{
+    job::JobManagerVibeCheckReply,
+    job::{JobFailureReason, JobOutput, JobStatus},
+    state::State,
+};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
 pub type JobId = String;
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", schema(example = json!({
+    "bansu_version": "0.5.0",
+    "queue_length": 12,
+    "max_queue_length": 30,
+    "active_jobs": 13,
+    "max_concurrent_jobs": 10,
+    "uptime": 986986
+})))]
+/// Response to a vibe check request
+pub struct VibeCheckResponse {
+    /// Bansu version
+    pub bansu_version: String,
+    /// Length of the queue or null if queue disabled
+    pub queue_length: Option<usize>,
+    /// Max length of the queue or null if queue disabled
+    pub max_queue_length: Option<usize>,
+    /// Number of jobs currently being processed (or still available for downloading job results)
+    pub active_jobs: usize,
+    /// Max number of jobs to be run in parallel
+    pub max_concurrent_jobs: Option<usize>,
+    /// Uptime in seconds
+    pub uptime: u64,
+}
+
+impl VibeCheckResponse {
+    pub fn build(jmvc: JobManagerVibeCheckReply, state: &State) -> Self {
+        Self {
+            bansu_version: state.version.to_owned(),
+            queue_length: jmvc.queue_length,
+            max_queue_length: jmvc.max_queue_length,
+            active_jobs: jmvc.active_jobs,
+            max_concurrent_jobs: state.max_concurrent_jobs,
+            uptime: state.uptime(),
+        }
+    }
+}
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -151,12 +194,16 @@ pub struct JobSpawnReply {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[cfg_attr(feature = "utoipa", schema(
-    description = "Contains input SMILES string and an array of additional arguments passed to Acedrg.", 
+    description = "Contains either an input SMILES string or an input mmCIF file (base64-encoded) and an array of additional arguments passed to Acedrg.", 
     example = json!({"smiles": "Your SMILES string", "commandline_args": ["-z", "--something"]})
 ))]
 pub struct AcedrgArgs {
-    /// Input SMILES string
-    pub smiles: String,
-    /// Array of arguments for Acedrg . Note: not all Acedrg arguments are currently available
+    /// Input SMILES string (only one kind of input should be provided at a time)
+    pub smiles: Option<String>,
+    /// Input mmCIF file content, base64-encoded (only one kind of input should be provided at a time)
+    pub input_mmcif_base64: Option<String>,
+    /// CCD code for fetching the input structure from the PDBe (only one kind of input should be provided at a time)
+    pub ccd_code: Option<String>,
+    /// Array of arguments for Acedrg. Note: not all Acedrg arguments are currently available
     pub commandline_args: Vec<String>,
 }

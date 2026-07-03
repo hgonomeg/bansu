@@ -13,22 +13,34 @@ pub struct JobProcessConfiguration<'a> {
     pub working_dir: &'a str,
 }
 
+#[derive(Debug, Clone)]
+pub struct JobHandleConfiguration {
+    pub docker_image: Option<String>,
+}
+
 #[derive(Debug)]
+/// [JobHandle] wraps a pending job.
+/// [JobHandle]s are used by JobRunner's workers to run jobs.
+///
+/// Underneath, a [JobHandle] can either be a child process or a Docker container.
 pub enum JobHandle {
     Direct(Child),
     Docker(ContainerHandle),
 }
 
 impl JobHandle {
-    pub async fn new<'a>(cfg: JobProcessConfiguration<'a>) -> anyhow::Result<Self> {
-        if let Ok(image) = std::env::var("BANSU_DOCKER") {
+    pub async fn new<'a>(
+        p_cfg: JobProcessConfiguration<'a>,
+        j_cfg: JobHandleConfiguration,
+    ) -> anyhow::Result<Self> {
+        if let Some(image) = j_cfg.docker_image {
             log::info!("Spawning new container for job");
             let (res, time) = measure_time_async(async move {
                 ContainerHandle::new(
                     &image,
-                    [&[cfg.executable], cfg.args.as_slice()].concat(),
-                    cfg.working_dir,
-                    Some((cfg.working_dir, cfg.working_dir)),
+                    [&[p_cfg.executable], p_cfg.args.as_slice()].concat(),
+                    p_cfg.working_dir,
+                    Some((p_cfg.working_dir, p_cfg.working_dir)),
                 )
                 .await
             })
@@ -39,12 +51,12 @@ impl JobHandle {
         } else {
             log::info!("Spawning child process for job");
             let (child_res, time) = measure_time_async(async move {
-                Command::new(cfg.executable)
-                    .current_dir(cfg.working_dir)
+                Command::new(p_cfg.executable)
+                    .current_dir(p_cfg.working_dir)
                     .stdin(Stdio::null())
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
-                    .args(cfg.args)
+                    .args(p_cfg.args)
                     .spawn()
             })
             .await;
@@ -53,6 +65,8 @@ impl JobHandle {
             Ok(Self::Direct(child))
         }
     }
+    /// Awaits upon the completion of the job and returns the output.
+    ///
     /// This API is currently experimental
     pub async fn join(self) -> anyhow::Result<Output> {
         match self {

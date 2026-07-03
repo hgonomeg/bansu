@@ -1,9 +1,13 @@
 [package]
 name = "bansu"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 authors = ["Jakub Smulski <hgonomeg@gmail.com>"]
 edition = "2024"
 license = "GNU GPLv3"
+
+[workspace]
+members = [".", "db_schema/migrations"]
+
 
 [features]
 default = ["utoipa"]
@@ -11,21 +15,23 @@ utoipa = ["dep:utoipa"]
 
 [dependencies]
 actix = "0.13"
-actix-governor = "0.8"
+actix-governor = "0.10"
 actix-rt = "2"
 actix-web = "4"
-actix-ws = "0.3"
+actix-ws = "0.4"
 anyhow = "1"
-bollard = { version = "0.19", features = ["tokio-stream"] }
-# bytes = "1"
+base64 = "0.22"
+bollard = { version = "0.20", features = ["tokio-stream"] }
+bytes = "1"
+chrono = "0.4"
 futures-util = "0.3"
 log = "0.4"
-# lazy_static = "1"
+reqwest = { version = "0.13", features = ["json", "stream"] }
+sea-orm = { version = "2.0.0-rc", features = ["macros", "sqlx-all", "runtime-tokio"]}
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 simple_logger = { version = "5", features = ["stderr"] }
 thiserror = "2"
-# tempfile = "3.10.1"
 tokio = { version = "1", features = ["fs", "io-util", "libc", "net", "time", "process", "signal", "rt-multi-thread", "sync", "macros"] }
 tokio-stream = { version = "0.1", features = ["time", "fs", "io-util", "net", "signal", "sync"] }
 utoipa = { version = "5", features = ["actix_extras", "yaml"] , optional = true }

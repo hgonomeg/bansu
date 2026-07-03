@@ -28,11 +28,24 @@ All data is deleted after job's ID becomes invalid i.e. expires.
 
 ### Security
 
-All data (temporary directories with all artifacts) is automatically deleted after job's ID becomes invalid.
-Whomever has the ID, can access your data. Treat the ID as both an identifier and a security token.
+#### Data management
+
+All data (temporary directories with all artifacts) is automatically deleted after job's ID becomes invalid / expires.
+Whomever has the ID, can access your data (for as long as the ID remains valid). Treat the ID as both an identifier and a security token.
 
 Keep in mind that not sharing your ID token does not prevent the server administrator from being able to see your data.
 For maximum data security, you may want to run your own instance of Bansu.
+
+Depending on whether the server administrator enabled usage statistics collection, some data may be stored for longer than the ID expiration period. This includes:
+
+* Time of making requests
+* IP address
+* success / failure information
+* processing time
+
+Any job details (CIF files, SMILES strings, Acedrg output etc.) are not permanently stored by the server.
+
+#### Isolation of jobs
 
 For security reasons, the server also supports running jobs
 in Docker containers which is the recommended thing to do.
@@ -55,16 +68,45 @@ The following environment variables control the behavior of the server:
 * `BANSU_ACEDRG_TIMEOUT` - specifies timeout for Acedrg (in seconds) (`120` by default)
 * `BANSU_MAX_CONCURRENT_JOBS` - specifies the maximum number of jobs running in parallel (`20` by default). Use `0` to disable limit.
 * `BANSU_MAX_JOB_QUEUE_LENGTH` - specifies the maximum number of jobs waiting in queue to be processed. (`20` by default). Use `0` to disable job queueing.
-* `BANSU_RATELIMIT_BURST_SIZE` - specifis [burst size for rate limiter](https://docs.rs/actix-governor/0.8.0/actix_governor/struct.GovernorConfigBuilder.html#method.burst_size) (per IP address; `45` by default)
-* `BANSU_RATELIMIT_SECONDS_PER_REQUEST` - specifies the [interval (in seconds) after which the rate limiter replenishes quota element](https://docs.rs/actix-governor/0.8.0/actix_governor/struct.GovernorConfigBuilder.html#method.seconds_per_request) (`10` by default). Divide 60 by this number to arrive at requests per minute per IP address.
+* `BANSU_RATELIMIT_BURST_SIZE` - specifis [burst size for rate limiter](https://docs.rs/actix-governor/0.10.0/actix_governor/struct.GovernorConfigBuilder.html#method.burst_size) (per IP address; `45` by default)
+* `BANSU_RATELIMIT_SECONDS_PER_REQUEST` - specifies the [interval (in seconds) after which the rate limiter replenishes quota element](https://docs.rs/actix-governor/0.10.0/actix_governor/struct.GovernorConfigBuilder.html#method.seconds_per_request) (`10` by default). Divide 60 by this number to arrive at requests per minute per IP address.
 * `BANSU_DISABLE_RATELIMIT` - can be set to disable rate-limiting of requests. (For testing only)
 * `BANSU_DISABLE_APIDOC` - Disable json/yaml OpenAPI documentation at `/api-docs/openapi.json`
+* `BANSU_USAGE_STATS_DB` - Sets the DB connection ([as defined here](https://www.sea-ql.org/SeaORM/docs/install-and-config/connection/)) used for storing usage data (Not used by default)
 
 ## API
 
 Below is my hand-written documentation.
 For an experimental auto-generated documentation, [click here](API_DOCUMENTATION.md).
 The server exposes the following API:
+
+### HTTP GET `/vibe_check`
+
+Health check endpoint.
+
+Returns the following JSON:
+
+```json5
+{
+    /// Bansu version
+    "bansu_version": "0.5.0",
+    /// Current length of the queue or null if queue disabled
+    "queue_length": 12,
+    /// Max length of the queue or null if queue disabled
+    "max_queue_length": 30,
+    /// Number of jobs currently being processed (or still available for downloading job results)
+    "active_jobs": 13,
+    /// Max number of jobs to be run in parallel
+    "max_concurrent_jobs": 10,
+    /// Uptime in seconds
+    "uptime": 986986
+}
+```
+
+Returns:
+
+* `200 OK` - All is ok.
+
 
 ### HTTP POST `/run_acedrg`
 
@@ -73,7 +115,12 @@ Accepts the following JSON payload:
 
 ```json5
 {
+    /// Input SMILES string (only one input should be present at a time)
     "smiles": "Your SMILES string",
+    /// Input mmCIF file, base64-encoded (only one input should be present at a time)
+    "input_mmcif_base64": "",
+    /// CCD code for fetching the input structure from the PDBe (only one input should be present at a time)
+    "ccd_code": "ALA",
     /// An array of additional arguments passed to acedrg
     /// Note: not all Acedrg arguments are currently available
     "commandline_args": ["-z", "--something"]
@@ -164,18 +211,21 @@ Just use:
 
 No special compile-time dependencies are needed.
 
-There is one optional runtime dependency: Docker.
+There are two optional runtime dependencies: 
+
+* Docker (for job isolation)
+* A database implementation (Sqlite3 / MySQL / PostgresDB; for collection of usage statistics)
 
 The server manages docker containers (as described above in the security section).
 It needs to have adequate permissions in order to do that.
 The server uses the `bollard` crate to setup Docker connection using platform-dependent defaults (Unix pipe, Windows socket, fallback: HTTP).
-Refer to [bollard documentation for more details](https://docs.rs/bollard/0.17.1/bollard/struct.Docker.html#method.connect_with_defaults).
+Refer to [bollard documentation for more details](https://docs.rs/bollard/0.20.1/bollard/struct.Docker.html#method.connect_with_defaults).
 
 If you do not want to make use of Docker support, make sure that `acedrg` and `servalcat` are available in the system path.
 
 ### Docker container setup
 
-A `Dockerfile` is included to build a suitable Docker container image.
+A `Dockerfile` (`FedoraDockerfile`) is included to build a suitable Docker container image.
 The image is based on Fedora but can be used on any distribution.
 
 In order to build it:
@@ -183,6 +233,20 @@ In order to build it:
 1. Go to `docker/`
 2. Run `docker build --pull --network host -t <name_of_your_image> -f FedoraDockerfile .`
 3. Wait for the image to be built.
+
+Please test your Docker images before using them in production.
+The script pulls Acedrg source code as is. It sometimes unfortunately happens that Acedrg developers push broken versions.
+
+#### Usage statistics database setup
+
+Navigate to `db_schema/migrations`.
+There you will find a SeaORM-powered utility to setup your database for collecting usage statistics.
+
+Usage:
+
+`$ cargo run -p migration -- -u <your_database_url>`
+
+Database URL format is the same as used by `BANSU_USAGE_STATS_DB`.
 
 #### Docker UID & permissions
 
@@ -197,13 +261,14 @@ In order to test Bansu, you can make use of the provided Node.JS script.
 0. Launch the Bansu server
 1. Go to `node_tests/`
 2. Run `npm install` to fetch Node dependencies
-3. Run `node localhost_test.mjs` - it will spawn an Acedrg job, then wait until it finishes and try to get CIF.
+3. Run `node test_acedrg_job.mjs` - it will spawn an Acedrg job, then wait until it finishes and try to get CIF.
 
 Environment variables for the test:
 
-* `BANSU_ADDRESS` - as for the server
-* `BANSU_PORT` - as for the server
+* `BANSU_URL` - the URL to be used for Bansu connection (default: `http://localhost:8080`)
 * `BANSU_TEST_SMILES` - SMILES string used for testing (default: `c1ccccc1`)
+* `BANSU_TEST_MMCIF` - Specifies mmCIF file name to be used as Acedrg input (instead of working with SMILES)
+* `BANSU_TEST_CCD_CODE` - Specifies CCD code to be fetched and used as Acedrg input (instead of working with SMILES or an mmCIF file)
 * `BANSU_TEST_ACEDRG_ARGS` - Args for Acedrg (default: `[]`) This is a JSON array of commandline arguments. 
 
 Feel free to hack with the script to adjust it to your needs.
@@ -234,9 +299,7 @@ Combined together gives us:
 
 ## Todo
 
-* Do not depend on setenv / getenv for spawning jobs
 * Update job output in realtime
-* Some kind of request logging for statistics
 * Some way of achieving interactivity (admin console?)
 * Graceful shutdown (finishing current jobs + what's already in the queue)
 * Maintaining a database of docker containers + temporary directories (for automatic cleanup after dirty shutdown)

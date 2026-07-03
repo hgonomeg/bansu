@@ -1,5 +1,8 @@
 use super::{Job, JobSpawnError, JobType};
-use crate::job::{job_handle::JobHandle, job_runner::OutputKind};
+use crate::job::{
+    job_handle::{JobHandle, JobHandleConfiguration},
+    job_runner::OutputKind,
+};
 use std::{
     future::Future,
     path::{Path, PathBuf},
@@ -31,6 +34,7 @@ impl Job for ServalcatJob {
 
     fn launch<'a>(
         &'a self,
+        _job_handle_configuration: JobHandleConfiguration,
         _workdir_path: &'a std::path::Path,
         _input_file_path: &'a std::path::Path,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<JobHandle>> + 'a>> {

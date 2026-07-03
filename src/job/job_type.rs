@@ -6,7 +6,10 @@ use std::{
 };
 use thiserror::Error;
 
-use super::{job_handle::JobHandle, job_runner::OutputKind};
+use super::{
+    job_handle::{JobHandle, JobHandleConfiguration},
+    job_runner::OutputKind,
+};
 
 pub mod acedrg;
 pub mod atman;
@@ -32,6 +35,7 @@ pub trait Job: Send {
     // This might need a redesign so that it combines writing input with launching
     fn launch<'a>(
         &'a self,
+        job_handle_configuration: JobHandleConfiguration,
         workdir_path: &'a Path,
         input_file_path: &'a Path,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<JobHandle>> + 'a>>;

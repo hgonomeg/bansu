@@ -1,7 +1,7 @@
 # Bansu
 
 - **OpenAPI Version:** `3.1.0`
-- **API Version:** `0.4.0-alpha`
+- **API Version:** `0.5.0-alpha`
 
 Server-side computation API for Moorhen
 
@@ -41,15 +41,23 @@ Creates `Acedrg` job.
 
 - **`commandline_args` (required)**
 
-  `array` — Array of arguments for Acedrg . Note: not all Acedrg arguments are currently available
+  `array` — Array of arguments for Acedrg. Note: not all Acedrg arguments are currently available
 
   **Items:**
 
   `string`
 
-- **`smiles` (required)**
+- **`ccd_code`**
 
-  `string` — Input SMILES string
+  `string | null` — CCD code for fetching the input structure from the PDBe (only one kind of input should be provided at a time)
+
+- **`input_mmcif_base64`**
+
+  `string | null` — Input mmCIF file content, base64-encoded (only one kind of input should be provided at a time)
+
+- **`smiles`**
+
+  `string | null` — Input SMILES string (only one kind of input should be provided at a time)
 
 **Example:**
 
@@ -195,6 +203,57 @@ Creates `Acedrg` job.
 }
 ```
 
+### GET /vibe\_check
+
+- **Method:** `GET`
+- **Path:** `/vibe_check`
+- **Tags:** 
+
+Health check endpoint.
+
+#### Responses
+
+##### Status: 200 Server is up and running
+
+###### Content-Type: application/json
+
+- **`active_jobs` (required)**
+
+  `integer` — Number of jobs currently being processed (or still available for downloading job results)
+
+- **`bansu_version` (required)**
+
+  `string` — Bansu version
+
+- **`uptime` (required)**
+
+  `integer`, format: `int64` — Uptime in seconds
+
+- **`max_concurrent_jobs`**
+
+  `integer | null` — Max number of jobs to be run in parallel
+
+- **`max_queue_length`**
+
+  `integer | null` — Max length of the queue or null if queue disabled
+
+- **`queue_length`**
+
+  `integer | null` — Length of the queue or null if queue disabled
+
+**Example:**
+
+```
+{
+  "active_jobs": 13,
+  "bansu_version": "0.5.0",
+  "max_concurrent_jobs": 10,
+  "max_queue_length": 30,
+  "queue_length": 12,
+  "uptime": 986986
+}
+```
+
 ### GET /ws/{job\_id}
 
 - **Method:** `GET`
@@ -264,19 +323,27 @@ The connection ignores all messages sent to it (responds only to Ping messages).
 
 - **Type:**`object`
 
-Contains input SMILES string and an array of additional arguments passed to Acedrg.
+Contains either an input SMILES string or an input mmCIF file (base64-encoded) and an array of additional arguments passed to Acedrg.
 
 - **`commandline_args` (required)**
 
-  `array` — Array of arguments for Acedrg . Note: not all Acedrg arguments are currently available
+  `array` — Array of arguments for Acedrg. Note: not all Acedrg arguments are currently available
 
   **Items:**
 
   `string`
 
-- **`smiles` (required)**
+- **`ccd_code`**
 
-  `string` — Input SMILES string
+  `string | null` — CCD code for fetching the input structure from the PDBe (only one kind of input should be provided at a time)
+
+- **`input_mmcif_base64`**
+
+  `string | null` — Input mmCIF file content, base64-encoded (only one kind of input should be provided at a time)
+
+- **`smiles`**
+
+  `string | null` — Input SMILES string (only one kind of input should be provided at a time)
 
 **Example:**
 
@@ -354,6 +421,49 @@ Contains input SMILES string and an array of additional arguments passed to Aced
 - **Type:**`string`
 
 **Example:**
+
+### VibeCheckResponse
+
+- **Type:**`object`
+
+Response to a vibe check request
+
+- **`active_jobs` (required)**
+
+  `integer` — Number of jobs currently being processed (or still available for downloading job results)
+
+- **`bansu_version` (required)**
+
+  `string` — Bansu version
+
+- **`uptime` (required)**
+
+  `integer`, format: `int64` — Uptime in seconds
+
+- **`max_concurrent_jobs`**
+
+  `integer | null` — Max number of jobs to be run in parallel
+
+- **`max_queue_length`**
+
+  `integer | null` — Max length of the queue or null if queue disabled
+
+- **`queue_length`**
+
+  `integer | null` — Length of the queue or null if queue disabled
+
+**Example:**
+
+```
+{
+  "active_jobs": 13,
+  "bansu_version": "0.5.0",
+  "max_concurrent_jobs": 10,
+  "max_queue_length": 30,
+  "queue_length": 12,
+  "uptime": 986986
+}
+```
 
 ### WsJobDataUpdate
 

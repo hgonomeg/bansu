@@ -3,7 +3,7 @@ use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer, get,
     middleware::Condition,
-    options, /*http::StatusCode*/ post,
+    options, post,
     web::{self, Data},
 };
 use actix_ws::handle as ws_handle;
@@ -13,16 +13,23 @@ use utoipa::OpenApi;
 pub mod job;
 use anyhow::Context;
 use job::{
-    JobEntry, JobManager, LookupJob, NewJob,
+    JobEntry, JobManager, JobManagerVibeCheck, LookupJob, NewJob,
+    job_handle::JobHandleConfiguration,
     job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
     job_type::{JobSpawnError, acedrg::AcedrgJob},
 };
 pub mod messages;
+use messages::*;
+pub mod usage_statistics;
+use usage_statistics::{FreshJobCommiter, RequestStatCommiter, RequestStatCommiterConsumer};
+pub mod usage_statistics_entity;
 pub mod utils;
 pub mod ws_connection;
-use messages::*;
-use tokio::io::AsyncReadExt;
 use ws_connection::WsConnection;
+pub mod state;
+use state::State;
+use tokio::io::AsyncReadExt;
+
 // use log::{info,warn,error,debug};
 
 #[cfg(feature = "utoipa")]
@@ -32,7 +39,7 @@ use ws_connection::WsConnection;
         title = "Bansu",
         description = "Server-side computation API for Moorhen"
     ),
-    paths(get_cif, run_acedrg, job_ws)
+    paths(get_cif, run_acedrg, job_ws, vibe_check)
 )]
 struct ApiDoc;
 
@@ -51,16 +58,32 @@ struct ApiDoc;
     )
 ))]
 #[get("/get_cif/{job_id}")]
-async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>>) -> HttpResponse {
+async fn get_cif(
+    path: web::Path<JobId>,
+    job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    http_req: HttpRequest,
+) -> HttpResponse {
+    let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &http_req);
     let job_id = path.into_inner();
 
     let Some(job_entry) = job_manager.send(LookupJob(job_id.clone())).await.unwrap() else {
         log::error!("/get_cif/{} - Job not found", job_id);
+        tokio::spawn(async move {
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some("Job not found".into()))
+                .await;
+        });
         return HttpResponse::NotFound().finish();
     };
 
     let JobEntry::Spawned(job) = job_entry else {
         log::error!("/get_cif/{} - Job is still queued.", job_id);
+        tokio::spawn(async move {
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some("Job is still queued".into()))
+                .await;
+        });
         return HttpResponse::BadRequest().finish();
     };
 
@@ -73,15 +96,34 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
 
     match file_res {
         Err(OutputRequestError::IOError(e)) => {
-            log::error!("/get_cif/{} - Could not open output - {}", job_id, &e);
+            let error_msg = format!("Could not open output - {}", &e);
+            log::error!("/get_cif/{} - {}", job_id, &error_msg);
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some(error_msg))
+                    .await;
+            });
             HttpResponse::InternalServerError().body(e.to_string())
         }
         Err(OutputRequestError::JobStillPending) => {
             log::warn!("/get_cif/{} - Job is still pending.", job_id);
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some("Job is still pending".into()))
+                    .await;
+            });
             HttpResponse::BadRequest().finish()
         }
         Err(OutputRequestError::OutputKindNotSupported) => {
             log::error!("/get_cif/{} - This job does not support CIF output", job_id);
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(
+                        &job_manager,
+                        Some("This job does not support CIF output".into()),
+                    )
+                    .await;
+            });
             HttpResponse::BadRequest().finish()
         }
         Ok(mut file) => {
@@ -107,7 +149,9 @@ async fn get_cif(path: web::Path<JobId>, job_manager: web::Data<Addr<JobManager>
                     }
                 }
             });
-
+            tokio::spawn(async move {
+                stats_commiter_opt.commit_successful(&job_manager).await;
+            });
             HttpResponse::Ok().streaming(tokio_stream::wrappers::ReceiverStream::new(rx))
         }
     }
@@ -146,9 +190,11 @@ The connection ignores all messages sent to it (responds only to Ping messages).
 async fn job_ws(
     path: web::Path<JobId>,
     req: HttpRequest,
+    state: web::Data<State>,
     payload: web::Payload,
     job_manager: web::Data<Addr<JobManager>>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &req);
     let job_id = path.into_inner();
     let Some(job_entry) = job_manager
         .send(LookupJob(job_id.clone()))
@@ -157,6 +203,11 @@ async fn job_ws(
         .flatten()
     else {
         log::error!("/ws/{} - Job not found", job_id);
+        tokio::spawn(async move {
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some("Job not found".into()))
+                .await;
+        });
         return Ok(HttpResponse::NotFound().finish());
     };
     let jm = job_manager.get_ref().clone();
@@ -166,11 +217,15 @@ async fn job_ws(
     };
     let (response, session, msg_stream) = ws_handle(&req, payload)?;
     WsConnection::new(jm, job_opt, job_id, session, msg_stream);
+    tokio::spawn(async move {
+        stats_commiter_opt.commit_successful(&job_manager).await;
+    });
     Ok(response)
 }
 
 #[options("/run_acedrg")]
 // This is here due to CORS necessities
+// Do we want to add this to utoipa?
 async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
     // if let Some(val) = req.headers().get("Access-Control-Request-Method") {
     //     if val.to_str().unwrap_or("") != "POST" {
@@ -216,33 +271,68 @@ async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
 async fn run_acedrg(
     args: web::Json<AcedrgArgs>,
     job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    req: HttpRequest,
 ) -> HttpResponse {
+    let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &req);
+    let job_commiter_opt = FreshJobCommiter::with_state_and_request(&state, &req);
     let args = args.into_inner();
     let jo = Arc::from(AcedrgJob { args });
 
     match job_manager.send(NewJob(jo)).await.unwrap() {
-        Ok(resp) => match resp.entry {
-            JobEntry::Spawned(_job) => HttpResponse::Created().json(JobSpawnReply {
-                job_id: Some(resp.id),
-                error_message: None,
-                queue_position: None,
-            }),
-            JobEntry::Queued(queue_pos) => HttpResponse::Accepted().json(JobSpawnReply {
-                job_id: Some(resp.id),
-                error_message: None,
-                queue_position: Some(queue_pos),
-            }),
-        },
+        Ok(resp) => {
+            let resp_id = resp.id.clone();
+            tokio::spawn(async move {
+                if let Some(commiter) = job_commiter_opt {
+                    commiter.commit_fresh_job(Some(resp_id), None).await
+                }
+                stats_commiter_opt.commit_successful(&job_manager).await;
+            });
+            match resp.entry {
+                JobEntry::Spawned(_job) => HttpResponse::Created().json(JobSpawnReply {
+                    job_id: Some(resp.id),
+                    error_message: None,
+                    queue_position: None,
+                }),
+                JobEntry::Queued(queue_pos) => HttpResponse::Accepted().json(JobSpawnReply {
+                    job_id: Some(resp.id),
+                    error_message: None,
+                    queue_position: Some(queue_pos),
+                }),
+            }
+        }
         Err(JobSpawnError::InputValidation(e)) => {
-            log::warn!("/run_acedrg - Could not create job: {:#}", &e);
+            let error_msg = format!("Could not create job: Input validation error - {:#}", &e);
+            log::warn!("/run_acedrg - {}", &error_msg);
+            let error_msg_c = error_msg.clone();
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some(error_msg_c.clone()))
+                    .await;
+                if let Some(commiter) = job_commiter_opt {
+                    commiter.commit_fresh_job(None, Some(error_msg_c)).await
+                }
+            });
             HttpResponse::BadRequest().json(JobSpawnReply {
                 job_id: None,
-                error_message: Some(format!("{:#}", e)),
+                error_message: Some(error_msg),
                 queue_position: None,
             })
         }
         Err(JobSpawnError::TooManyJobs) => {
-            log::warn!("/run_acedrg - Could not create job: Too many jobs");
+            let error_msg = "Could not create job: Too many jobs";
+            log::warn!("/run_acedrg - {}", error_msg);
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some(error_msg.to_string()))
+                    .await;
+
+                if let Some(commiter) = job_commiter_opt {
+                    commiter
+                        .commit_fresh_job(None, Some(error_msg.to_string()))
+                        .await
+                }
+            });
             HttpResponse::ServiceUnavailable().json(JobSpawnReply {
                 job_id: None,
                 error_message: Some("Server is at capacity. Please try again later.".to_string()),
@@ -250,20 +340,62 @@ async fn run_acedrg(
             })
         }
         Err(JobSpawnError::Other(e)) => {
-            log::error!("/run_acedrg - Could not create job: {:#}", &e);
+            let error_msg = format!("Could not create job: {:#}", &e);
+            log::error!("/run_acedrg - {}", &error_msg);
+            let error_msg_c = error_msg.clone();
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some(error_msg_c.clone()))
+                    .await;
+                if let Some(commiter) = job_commiter_opt {
+                    commiter.commit_fresh_job(None, Some(error_msg_c)).await
+                }
+            });
             HttpResponse::InternalServerError().json(JobSpawnReply {
                 job_id: None,
-                error_message: Some(format!("{:#}", e)),
+                error_message: Some(error_msg),
                 queue_position: None,
             })
         }
     }
 }
 
+#[cfg_attr(
+    feature = "utoipa",
+    utoipa::path(description = "Health check endpoint.",
+    responses(
+        (status = 200, description = "Server is up and running", body = VibeCheckResponse),
+        // (status = 500, description = "Server is not running properly")
+    ),
+))]
+#[get("/vibe_check")]
+async fn vibe_check(
+    job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    http_req: HttpRequest,
+) -> HttpResponse {
+    let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &http_req);
+    log::info!("/vibe_check - Replying to vibe check request");
+    // We can safely unwrap because JobManagerVibeCheck does not fail
+    let jmvc = job_manager.send(JobManagerVibeCheck).await.unwrap();
+    tokio::spawn(async move {
+        if let Some(commiter) = stats_commiter_opt {
+            commiter
+                .commit_successful(
+                    jmvc.queue_length.unwrap_or(0) as i64,
+                    jmvc.active_jobs as i64,
+                )
+                .await;
+        }
+    });
+    let response = VibeCheckResponse::build(jmvc, &state);
+    HttpResponse::Ok().json(response)
+}
+
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     eprintln!(
-        "Bansu Server, v{} \n\nAuthors: {}\nLicense: {}\nCopyright (C) 2024 - 2025, Global Phasing Ltd.",
+        "Bansu Server, v{} \n\nAuthors: {}\nLicense: {}\nCopyright (C) 2024 - 2026, Global Phasing Ltd.",
         env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_AUTHORS"),
         env!("CARGO_PKG_LICENSE")
@@ -279,22 +411,21 @@ async fn main() -> anyhow::Result<()> {
         .with_context(|| "Could not parse port number")?
         .unwrap_or(8080);
 
-    if let Ok(docker_image_name) = env::var("BANSU_DOCKER") {
+    let docker_configuration = if let Ok(docker_image_name) = env::var("BANSU_DOCKER") {
         log::info!("Testing Docker configuration...");
         if let Err(e) = utils::test_docker(&docker_image_name).await {
             log::error!("Docker test failed - {:#}. Disabling Docker support.", e);
-            // todo: Do not depend on setenv / getenv while spawning jobs
-            unsafe {
-                env::remove_var("BANSU_DOCKER");
-            }
+            None
         } else {
             log::info!("Docker test successful.");
+            Some(docker_image_name)
         }
     } else {
         log::info!("Docker configuration was not provided.");
-    }
+        None
+    };
 
-    if env::var("BANSU_DOCKER").is_err() {
+    if docker_configuration.is_none() {
         if env::var("BANSU_DISALLOW_DOCKERLESS").is_ok() {
             let e = anyhow::anyhow!(
                 "No (valid) Docker configuration was provided and BANSU_DISALLOW_DOCKERLESS is set. Refusing to continue."
@@ -312,7 +443,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    if env::var("BANSU_DOCKER").is_ok() {
+    if docker_configuration.is_some() {
         log::info!("Starting with Docker support.");
     } else {
         log::info!("Starting without Docker support.");
@@ -346,7 +477,28 @@ async fn main() -> anyhow::Result<()> {
         }
     );
 
-    let job_manager = JobManager::new(max_concurrent_jobs, max_queue_length).start();
+    let usage_stats_db = match env::var("BANSU_USAGE_STATS_DB").ok() {
+        Some(db_url) => Some(
+            sea_orm::Database::connect(db_url)
+                .await
+                .with_context(|| "Could not connect to usage statistics database.")?,
+        ),
+        None => {
+            log::info!("Usage statistics database configuration not provided.");
+            None
+        }
+    };
+
+    let state_data = Data::new(State::new(max_concurrent_jobs, usage_stats_db.clone()));
+    let job_manager = JobManager::new(
+        max_concurrent_jobs,
+        max_queue_length,
+        JobHandleConfiguration {
+            docker_image: docker_configuration,
+        },
+        usage_stats_db,
+    )
+    .start();
 
     let governor_conf = if env::var("BANSU_DISABLE_RATELIMIT").is_err() {
         let burst_size = env::var("BANSU_RATELIMIT_BURST_SIZE")
@@ -432,7 +584,8 @@ async fn main() -> anyhow::Result<()> {
             #[cfg(feature = "utoipa")] apidoc: Option<utoipa::openapi::OpenApi>,
             #[cfg(not(feature = "utoipa"))] _apidoc: (),
         ) {
-            cfg.service(run_acedrg)
+            cfg.service(vibe_check)
+                .service(run_acedrg)
                 .service(run_acedrg_preflight)
                 .service(get_cif)
                 .service(job_ws);
@@ -477,6 +630,7 @@ async fn main() -> anyhow::Result<()> {
                 Governor::new(&governor_conf),
             ))
             .app_data(Data::new(job_manager.clone()))
+            .app_data(state_data.clone())
             .configure(|cfg: &mut actix_web::web::ServiceConfig| configure_paths(cfg, pconfig))
     })
     .bind((addr, port))?
