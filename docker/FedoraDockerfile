@@ -13,7 +13,7 @@ RUN dnf install -y helix vim fd-find ag
 # As of now, there seems to be no omegaconf package in Fedora repos
 RUN pip install omegaconf
 RUN cd /usr/share && git clone https://github.com/MonomerLibrary/monomers
-RUN mkdir -p /usr/share/atman && cd /usr/share/atman && wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 https://quicillith.pl/atman/cod.sqlite
+RUN mkdir -p /usr/share/aardvark && cd /usr/share/aardvark && wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 https://quicillith.pl/atman/cod.sqlite
 COPY wrappers/ccp4-python /usr/bin/ccp4-python
 COPY wrappers/servalcat /usr/bin/servalcat
 COPY setup_bansu_fedora_image.sh /setup_bansu_fedora_image.sh

@@ -4,7 +4,7 @@ do_wget() {
   wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 "$@" || exit 7
 }
 
-ATMAN_VER=0.1.0
+AARDVARK_VER=0.1.0
 # Currently, gemmi build fails if we use anything newer than eigen 3
 LIBEIGEN_VER=3.4.0
 RDKIT_VER=2025_09_4
@@ -44,19 +44,19 @@ download_all() {
     do_wget https://github.com/keitaroyam/servalcat/archive/refs/tags/v${SERVALCAT_VER}.tar.gz -O servalcat-${SERVALCAT_VER}.tar.gz &&\
     tar -xf servalcat-${SERVALCAT_VER}.tar.gz || exit 7
 
-    # Atman
-    do_wget https://github.com/hgonomeg/atman/archive/refs/tags/v${ATMAN_VER}.tar.gz -O atman-${ATMAN_VER}.tar.gz &&\
-    tar -xf atman-${ATMAN_VER}.tar.gz || exit 7
+    # Aardvark
+    do_wget https://github.com/hgonomeg/aardvark/archive/refs/tags/v${AARDVARK_VER}.tar.gz -O aardvark-${AARDVARK_VER}.tar.gz &&\
+    tar -xf aardvark-${AARDVARK_VER}.tar.gz || exit 7
 }
 
-build_atman() {
+build_aardvark() {
   setup_build_env
-  mkdir -p /build/atman
-  cd /build/atman &&\
+  mkdir -p /build/aardvark
+  cd /build/aardvark &&\
   rm -rf *
-  g++ /download/atman-${ATMAN_VER}/Pauls_COD_stuff/cod_db.cpp -o cod_db -std=c++17 -O3 -lsqlite3 &&\
+  g++ /download/aardvark-${AARDVARK_VER}/Pauls_COD_stuff/cod_db.cpp -o cod_db -std=c++17 -O3 -lsqlite3 &&\
   install -m 755 cod_db /usr/bin/cod_db &&\
-  install -m 755 /download/atman-${ATMAN_VER}/Pauls_COD_stuff/cod_bridge.py /usr/bin/atman.py || exit 8
+  install -m 755 /download/aardvark-${AARDVARK_VER}/Pauls_COD_stuff/cod_bridge.py /usr/bin/aardvark.py || exit 8
   cd /build
 }
 
@@ -127,7 +127,7 @@ build_all() {
     build_gemmi &&\
     build_servalcat &&\
     build_acedrg &&\
-    build_atman || exit 8
+    build_aardvark || exit 8
 
     # Seems to be necessary for RDKit stuff to be found at runtime
     ldconfig

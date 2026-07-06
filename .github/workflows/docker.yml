@@ -1,7 +1,7 @@
 name: Build Bansu Fedora image
 
 # Builds and tests the image on every push that touches the Docker inputs (any
-# branch), then pushes the *tested* image to Docker Hub on `atman`.
+# branch), then pushes the *tested* image to Docker Hub on `aardvark`.
 # Push-only (no pull_request trigger) so a commit never builds twice in parallel.
 on:
   push:
@@ -68,21 +68,21 @@ jobs:
             echo "== monomer library =="
             test -d /usr/share/monomers
 
-            echo "== atman data =="
-            test -s /usr/share/atman/cod.sqlite
+            echo "== aardvark data =="
+            test -s /usr/share/aardvark/cod.sqlite
 
             echo "== acedrg =="
             command -v acedrg
             acedrg -h >/dev/null 2>&1 || echo "acedrg -h returned non-zero (review if unexpected)"
 
-            echo "== atman =="
+            echo "== aardvark =="
             # TODO: replace with a strict assertion once the installed binary name is confirmed.
-            ls -1 /usr/bin | grep -i atman || echo "no /usr/bin/*atman* found — adjust this check"
+            ls -1 /usr/bin | grep -i aardvark || echo "no /usr/bin/*aardvark* found — adjust this check"
 
             echo "All checks passed."
           '
 
-      # --- Publish the tested image to Docker Hub (atman pushes only) -----------
+      # --- Publish the tested image to Docker Hub (aardvark pushes only) -----------
       # Requires repo secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN.
       - name: Log in to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/atman'
