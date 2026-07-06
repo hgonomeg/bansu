@@ -13,6 +13,15 @@ SERVALCAT_VER=0.4.131
 # ACEDRG_VER=main
 ACEDRG_VER=bzr
 
+COOT_FORK=pemsley
+COOT_COMMIT=5da7e89b4bd014aea0d06a484877773ed09fb0be
+FFTW2_VER=2.1.5
+MMDB2_VER=2.0.22
+LIBCCP4_VER=8.0.0
+LIBSSM_VER=1.4
+CLIPPER_VER=2.1.20201109
+CLIPPER_DIR=clipper-2.1
+
 setup_build_env() {
   export CMAKE_BUILD_PARALLEL_LEVEL=`nproc --all`
 }
@@ -47,6 +56,25 @@ download_all() {
     # Aardvark
     do_wget https://github.com/hgonomeg/aardvark/archive/refs/tags/v${AARDVARK_VER}.tar.gz -O aardvark-${AARDVARK_VER}.tar.gz &&\
     tar -xf aardvark-${AARDVARK_VER}.tar.gz || exit 7
+
+    do_wget https://www.fftw.org/fftw-${FFTW2_VER}.tar.gz &&\
+    tar -xf fftw-${FFTW2_VER}.tar.gz || exit 7
+
+    do_wget https://www2.mrc-lmb.cam.ac.uk/personal/pemsley/coot/dependencies/mmdb2-${MMDB2_VER}.tar.gz &&\
+    tar -xf mmdb2-${MMDB2_VER}.tar.gz || exit 7
+
+    do_wget https://www2.mrc-lmb.cam.ac.uk/personal/pemsley/coot/dependencies/libccp4-${LIBCCP4_VER}.tar.gz &&\
+    tar -xf libccp4-${LIBCCP4_VER}.tar.gz || exit 7
+
+    do_wget https://www2.mrc-lmb.cam.ac.uk/personal/pemsley/coot/dependencies/ssm-${LIBSSM_VER}.tar.gz -O ssm-${LIBSSM_VER}.tar.gz &&\
+    tar -xf ssm-${LIBSSM_VER}.tar.gz || exit 7
+    do_wget "https://aur.archlinux.org/cgit/aur.git/plain/ssm.pc.in?h=libssm" -O ssm-${LIBSSM_VER}/ssm.pc.in
+
+    do_wget https://deb.debian.org/debian/pool/main/c/clipper/clipper_${CLIPPER_VER}.orig.tar.gz -O clipper-${CLIPPER_VER}.tar.gz &&\
+    tar -xf clipper-${CLIPPER_VER}.tar.gz || exit 7
+
+    git clone https://github.com/${COOT_FORK}/coot.git coot &&\
+    git -C coot checkout ${COOT_COMMIT} || exit 7
 }
 
 build_aardvark() {
@@ -121,13 +149,80 @@ build_servalcat() {
 }
 
 
+build_fftw2() {
+  setup_build_env
+  cd /download/fftw-${FFTW2_VER} &&\
+  ./configure --prefix=/usr --enable-shared --disable-static --with-gcc --with-gnu-ld &&\
+  make -j`nproc --all` && make install || exit 8
+  cd /build
+}
+
+build_mmdb2() {
+  setup_build_env
+  cd /download/mmdb2-${MMDB2_VER} &&\
+  FFLAGS="-std=f2008 -fallow-argument-mismatch" \
+  ./configure --prefix=/usr --enable-shared &&\
+  make -j`nproc --all` && make install || exit 8
+  cd /build
+}
+
+build_libccp4() {
+  setup_build_env
+  cd /download/libccp4-${LIBCCP4_VER} &&\
+  FFLAGS="-std=f2008 -fallow-argument-mismatch" \
+  CFLAGS="-Wno-incompatible-pointer-types -std=gnu17" \
+  ./configure --prefix=/usr --enable-shared --disable-static --datadir=/usr/share/ccp4 &&\
+  make -j`nproc --all` && make install || exit 8
+  cd /build
+}
+
+build_libssm() {
+  setup_build_env
+  cd /download/ssm-${LIBSSM_VER} &&\
+  aclocal && libtoolize --automake --copy && autoconf && automake --copy --add-missing --gnu &&\
+  ./configure --prefix=/usr --enable-shared --disable-static --enable-ccp4 &&\
+  make -j`nproc --all` && make install || exit 8
+  cd /build
+}
+
+build_libclipper() {
+  setup_build_env
+  sed -i 's/from >> &word\[0\]/from >> word/' /download/${CLIPPER_DIR}/clipper/cif/cif_data_io.cpp
+  cd /download/${CLIPPER_DIR} &&\
+  CXXFLAGS="-O2 -fno-strict-aliasing -Wno-narrowing" \
+  CFLAGS="-O2 -fno-strict-aliasing -Wno-narrowing" \
+  FFLAGS="-std=f2008 -fallow-argument-mismatch" \
+  ./configure --prefix=/usr --enable-shared --disable-static \
+    --enable-contrib --enable-ccp4 --enable-cif --enable-mmdb --enable-minimol \
+    --enable-cns --enable-phs --enable-fortran &&\
+  make -j`nproc --all` && make install || exit 8
+  cd /build
+}
+
+build_chapi() {
+  setup_build_env
+  mkdir -p /build/chapi
+  cd /build/chapi &&\
+  rm -rf *
+  cmake -S /download/coot \
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release &&\
+  cmake --build . && cmake --install . || exit 8
+  cd ..
+}
+
 build_all() {
     build_eigen &&\
     build_rdkit &&\
     build_gemmi &&\
     build_servalcat &&\
     build_acedrg &&\
-    build_aardvark || exit 8
+    build_aardvark &&\
+    build_fftw2 &&\
+    build_mmdb2 &&\
+    build_libccp4 &&\
+    build_libssm &&\
+    build_libclipper &&\
+    build_chapi || exit 8
 
     # Seems to be necessary for RDKit stuff to be found at runtime
     ldconfig
