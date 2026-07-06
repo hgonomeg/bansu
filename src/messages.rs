@@ -151,22 +151,6 @@ impl From<crate::job::JobData> for WsJobDataUpdate {
     }
 }
 
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// pub enum WsClientMessageKind {
-//     QueryJob,
-//     // This is a bad idea
-//     //SpawnAcedrg,
-
-//     //GetCIF
-// }
-
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// pub struct WsClientMessage {
-//     pub kind: WsClientMessageKind,
-//     /// for querying only
-//     pub job_id: Option<JobId>,
-// }
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct GenericErrorMessage {
     pub error_message: Option<String>,
@@ -206,4 +190,28 @@ pub struct AcedrgArgs {
     pub ccd_code: Option<String>,
     /// Array of arguments for Acedrg. Note: not all Acedrg arguments are currently available
     pub commandline_args: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", schema(
+    description = "input format for Aardvark", 
+    // example = json!({"smiles"})
+))]
+pub enum AardvarkInputFormat {
+    #[serde(rename = "smiles")]
+    Smiles,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", schema(
+    description = "Input for Aardvark jobs", 
+    example = json!({"smiles": "Your SMILES string", "data": "Ymx1cmdoZSBNY0JsYWggYmxhaCBibGFoCg=="})
+))]
+pub struct AardvarkArgs {
+    /// Input format for Aardvark
+    pub format: AardvarkInputFormat,
+    /// Input data (base64-encoded)
+    pub data: String,
 }

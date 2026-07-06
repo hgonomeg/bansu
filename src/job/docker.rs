@@ -2,11 +2,11 @@ use anyhow::Context;
 use bollard::{
     Docker,
     container::LogOutput,
+    models::{ContainerWaitExitError, ContainerWaitResponse, HostConfig, Mount, MountTypeEnum},
     query_parameters::{
         AttachContainerOptions, CreateContainerOptionsBuilder, StartContainerOptions,
         WaitContainerOptions,
     },
-    models::{ContainerWaitExitError, ContainerWaitResponse, HostConfig, Mount, MountTypeEnum},
 };
 use futures_util::StreamExt;
 use uuid::Uuid;

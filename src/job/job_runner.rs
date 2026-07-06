@@ -12,7 +12,7 @@ use tokio::time::timeout;
 
 pub enum OutputKind {
     CIF,
-    JSON
+    JSON,
 }
 
 #[derive(Debug, Error)]

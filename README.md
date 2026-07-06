@@ -156,9 +156,10 @@ Accepts the following JSON payload:
 
 ```json5
 {
+    /// Specifies the input format for Aardvark. Currently only "smiles" is supported.
     "format": "smiles",
-    /// Input data (in the format specified)
-    "data": "blurghe McBlah blah blah",
+    /// Base64-encoded  input data 
+    "data": "Ymx1cmdoZSBNY0JsYWggYmxhaCBibGFoCg==",
 }
 ```
 

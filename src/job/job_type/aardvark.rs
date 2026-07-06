@@ -1,14 +1,19 @@
 use super::{Job, JobSpawnError, JobType};
-use crate::job::{job_handle::JobHandle, job_runner::OutputKind, JobHandleConfiguration};
+use crate::AardvarkArgs;
+use crate::job::{JobHandleConfiguration, job_handle::JobHandle, job_runner::OutputKind};
 use std::{
     future::Future,
     path::{Path, PathBuf},
     pin::Pin,
 };
 
-pub struct Atman;
+pub struct AardvarkJob {
+    pub args: AardvarkArgs,
+}
 
-impl Job for Atman {
+pub struct Aardvark;
+
+impl Job for Aardvark {
     fn name(&self) -> &'static str {
         "Aardvark"
     }
@@ -33,7 +38,7 @@ impl Job for Atman {
         &'a self,
         _job_handle_configuration: JobHandleConfiguration,
         _workdir_path: &'a Path,
-        _input_file_path: &'a Path
+        _input_file_path: &'a Path,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<JobHandle>> + 'a>> {
         todo!()
     }

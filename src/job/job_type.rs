@@ -11,8 +11,8 @@ use super::{
     job_runner::OutputKind,
 };
 
-pub mod acedrg;
 pub mod aardvark;
+pub mod acedrg;
 pub mod servalcat;
 
 #[derive(Error, Debug)]

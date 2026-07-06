@@ -16,7 +16,7 @@ use job::{
     JobEntry, JobManager, JobManagerVibeCheck, LookupJob, NewJob,
     job_handle::JobHandleConfiguration,
     job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
-    job_type::{JobSpawnError, acedrg::AcedrgJob},
+    job_type::{JobSpawnError, aardvark::AardvarkJob, acedrg::AcedrgJob},
 };
 pub mod messages;
 use messages::*;
@@ -39,7 +39,7 @@ use tokio::io::AsyncReadExt;
         title = "Bansu",
         description = "Server-side computation API for Moorhen"
     ),
-    paths(get_cif, run_acedrg, job_ws, vibe_check)
+    paths(get_cif, run_acedrg, run_aardvark, job_ws, vibe_check)
 )]
 struct ApiDoc;
 
@@ -360,6 +360,29 @@ async fn run_acedrg(
     }
 }
 
+#[cfg_attr(feature = "utoipa", utoipa::path(
+    description = "Creates `Aardvark` job.",
+    // this gets confused with input for the POST request
+    // request_body = JobSpawnReply,
+    // There seems to be no better way than to specify 'body' multiple times.
+    responses(
+        (status = 201, description = "Success (job spawned)", body = JobSpawnReply),
+        (status = 202, description = "Success (job queued)", body = JobSpawnReply),
+        (status = 400, description = "Input validation error", body = JobSpawnReply),
+        (status = 503, description = "Server is currently at capacity and is unable to handle your request", body = JobSpawnReply),
+        (status = 500, description = "Other error", body = JobSpawnReply),
+    ),
+))]
+#[post("/run_aardvark")]
+async fn run_aardvark(
+    args: web::Json<AardvarkArgs>,
+    job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    req: HttpRequest,
+) -> HttpResponse {
+    HttpResponse::NotImplemented().finish()
+}
+
 #[cfg_attr(
     feature = "utoipa",
     utoipa::path(description = "Health check endpoint.",
@@ -587,6 +610,7 @@ async fn main() -> anyhow::Result<()> {
             cfg.service(vibe_check)
                 .service(run_acedrg)
                 .service(run_acedrg_preflight)
+                .service(run_aardvark)
                 .service(get_cif)
                 .service(job_ws);
 
