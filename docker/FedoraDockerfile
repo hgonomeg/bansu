@@ -8,7 +8,7 @@ RUN dnf install -y git rust cargo gcc gcc-c++ wget gzip
 RUN dnf install -y python python-devel pybind11-devel python-pybind11 python-nanobind-devel python-numpy python-setuptools python-pandas python-scipy python-networkx meson
 RUN dnf install -y boost boost-devel cmake breezy
 RUN dnf install -y make bison flex
-RUN dnf install -y fftw2-devel fftw-devel zlib-devel
+RUN dnf install -y fftw2-devel fftw-devel zlib-devel sqlite-devel
 RUN dnf install -y helix vim fd-find ag
 # As of now, there seems to be no omegaconf package in Fedora repos
 RUN pip install omegaconf

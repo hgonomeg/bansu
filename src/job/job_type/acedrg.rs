@@ -42,6 +42,7 @@ impl Job for AcedrgJob {
     fn output_filename(&self, workdir_path: &Path, kind: OutputKind) -> Option<PathBuf> {
         match kind {
             OutputKind::CIF => Some(workdir_path.join(format!("{}.cif", ACEDRG_OUTPUT_FILENAME))),
+            OutputKind::JSON => unreachable!("Acedrg does not produce JSON output"),
             // _ => None
         }
     }
