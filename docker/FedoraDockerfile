@@ -9,7 +9,7 @@ RUN dnf install -y python python-devel pybind11-devel python-pybind11 python-nan
 RUN dnf install -y boost boost-devel cmake breezy
 RUN dnf install -y make bison flex
 RUN dnf install -y fftw2-devel fftw-devel zlib-devel sqlite-devel gsl-devel libpng-devel glm-devel cairo-devel json-devel
-RUN dnf install -y autoconf automake libtool gcc-gfortran pkgconf-pkg-config 
+RUN dnf install -y autoconf automake libtool gcc-gfortran pkgconf-pkg-config doxygen
 RUN dnf install -y helix vim fd-find ag
 # As of now, there seems to be no omegaconf package in Fedora repos
 RUN pip install omegaconf
