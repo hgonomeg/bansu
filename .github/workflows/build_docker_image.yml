@@ -1,7 +1,7 @@
 name: Build Bansu Fedora image
 
 # Builds and tests the image on every push that touches the Docker inputs (any
-# branch), then pushes the *tested* image to Docker Hub on `aardvark`.
+# branch), then pushes the *tested* image to Docker Hub (only on the `atman` branch).
 # Push-only (no pull_request trigger) so a commit never builds twice in parallel.
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - docker/FedoraDockerfile
       - docker/setup_bansu_fedora_image.sh
       - docker/wrappers/**
-      - .github/workflows/docker.yml
+      - .github/workflows/build_docker_image.yml
   workflow_dispatch:
 
 # # A newer push to the same branch supersedes an in-flight run.
