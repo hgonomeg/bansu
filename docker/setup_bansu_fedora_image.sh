@@ -211,7 +211,8 @@ build_chapi() {
   cd /build/chapi &&\
   rm -rf *
   cmake -S /download/coot \
-  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release &&\
+  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release \
+  -Dnanobind_DIR=`python3 -m nanobind --cmake_dir` &&\
   cmake --build . && cmake --install . || exit 8
   cd ..
 }
