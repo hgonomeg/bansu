@@ -10,11 +10,11 @@ pub struct Atman;
 
 impl Job for Atman {
     fn name(&self) -> &'static str {
-        "Atman"
+        "Aardvark"
     }
 
     fn job_type(&self) -> JobType {
-        JobType::Atman
+        JobType::Aardvark
     }
 
     fn timeout_value(&self) -> std::time::Duration {
@@ -26,7 +26,7 @@ impl Job for Atman {
     }
 
     fn executable_name(&self) -> &'static str {
-        "atman"
+        "aardvark"
     }
 
     fn launch<'a>(
