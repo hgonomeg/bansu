@@ -7,9 +7,9 @@ do_wget() {
 AARDVARK_VER=0.1.0
 # Currently, gemmi build fails if we use anything newer than eigen 3
 LIBEIGEN_VER=3.4.0
-RDKIT_VER=2025_09_4
-GEMMI_VER=0.7.4
-SERVALCAT_VER=0.4.131
+RDKIT_VER=2026_03_3
+GEMMI_VER=0.7.5
+SERVALCAT_VER=0.4.142
 # ACEDRG_VER=main
 ACEDRG_VER=bzr
 
@@ -57,22 +57,28 @@ download_all() {
     do_wget https://github.com/hgonomeg/aardvark/archive/refs/tags/v${AARDVARK_VER}.tar.gz -O aardvark-${AARDVARK_VER}.tar.gz &&\
     tar -xf aardvark-${AARDVARK_VER}.tar.gz || exit 7
 
+    # FFTW2
     do_wget https://www.fftw.org/fftw-${FFTW2_VER}.tar.gz &&\
     tar -xf fftw-${FFTW2_VER}.tar.gz || exit 7
 
+    # mmdb2
     do_wget https://www2.mrc-lmb.cam.ac.uk/personal/pemsley/coot/dependencies/mmdb2-${MMDB2_VER}.tar.gz &&\
     tar -xf mmdb2-${MMDB2_VER}.tar.gz || exit 7
 
+    # libccp4
     do_wget https://www2.mrc-lmb.cam.ac.uk/personal/pemsley/coot/dependencies/libccp4-${LIBCCP4_VER}.tar.gz &&\
     tar -xf libccp4-${LIBCCP4_VER}.tar.gz || exit 7
 
+    # libssm
     do_wget https://www2.mrc-lmb.cam.ac.uk/personal/pemsley/coot/dependencies/ssm-${LIBSSM_VER}.tar.gz -O ssm-${LIBSSM_VER}.tar.gz &&\
-    tar -xf ssm-${LIBSSM_VER}.tar.gz || exit 7
-    do_wget "https://aur.archlinux.org/cgit/aur.git/plain/ssm.pc.in?h=libssm" -O ssm-${LIBSSM_VER}/ssm.pc.in
+    tar -xf ssm-${LIBSSM_VER}.tar.gz &&\
+    do_wget "https://aur.archlinux.org/cgit/aur.git/plain/ssm.pc.in?h=libssm" -O ssm-${LIBSSM_VER}/ssm.pc.in || exit 7
 
+    # libclipper
     do_wget https://deb.debian.org/debian/pool/main/c/clipper/clipper_${CLIPPER_VER}.orig.tar.gz -O clipper-${CLIPPER_VER}.tar.gz &&\
     tar -xf clipper-${CLIPPER_VER}.tar.gz || exit 7
 
+    # Coot / chapi
     git clone https://github.com/${COOT_FORK}/coot.git coot &&\
     git -C coot checkout ${COOT_COMMIT} || exit 7
 }
