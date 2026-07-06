@@ -12,10 +12,10 @@ on:
       - .github/workflows/docker.yml
   workflow_dispatch:
 
-# A newer push to the same branch supersedes an in-flight run.
-concurrency:
-  group: docker-${{ github.ref }}
-  cancel-in-progress: true
+# # A newer push to the same branch supersedes an in-flight run.
+# concurrency:
+#   group: docker-${{ github.ref }}
+#   cancel-in-progress: true
 
 env:
   IMAGE: quicillith/bansu_fedora
@@ -78,6 +78,9 @@ jobs:
             echo "== aardvark =="
             # TODO: replace with a strict assertion once the installed binary name is confirmed.
             ls -1 /usr/bin | grep -i aardvark || echo "no /usr/bin/*aardvark* found — adjust this check"
+
+            echo "== chapi (coot headless api) =="
+            python3 -c "import coot_headless_api; print(coot_headless_api.__file__)"
 
             echo "All checks passed."
           '
