@@ -66,6 +66,7 @@ The following environment variables control the behavior of the server:
 * `BANSU_DISALLOW_DOCKERLESS` - can be set to cause Bansu to refuse to run without Docker support
 * `BANSU_PERIODIC_WS_UPDATE_INTERVAL` - specifies the interval at which web socket connections send periodic status updates (in seconds; `16` by default)
 * `BANSU_ACEDRG_TIMEOUT` - specifies timeout for Acedrg (in seconds) (`120` by default)
+* `BANSU_AARDVARK_TIMEOUT` - specifies timeout for Aardvark (in seconds) (`240` by default; I'd recommend to keep it at least twice the Acedrg's timeout)
 * `BANSU_MAX_CONCURRENT_JOBS` - specifies the maximum number of jobs running in parallel (`20` by default). Use `0` to disable limit.
 * `BANSU_MAX_JOB_QUEUE_LENGTH` - specifies the maximum number of jobs waiting in queue to be processed. (`20` by default). Use `0` to disable job queueing.
 * `BANSU_RATELIMIT_BURST_SIZE` - specifis [burst size for rate limiter](https://docs.rs/actix-governor/0.10.0/actix_governor/struct.GovernorConfigBuilder.html#method.burst_size) (per IP address; `45` by default)
