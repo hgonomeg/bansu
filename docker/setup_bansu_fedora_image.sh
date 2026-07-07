@@ -4,7 +4,7 @@ do_wget() {
   wget --retry-connrefused --waitretry=1 --read-timeout=10 --timeout=10 -t 15 "$@" || exit 7
 }
 
-AARDVARK_VER=0.1.0
+AARDVARK_VER=0.2.0
 # Currently, gemmi build fails if we use anything newer than eigen 3
 LIBEIGEN_VER=3.4.0
 RDKIT_VER=2026_03_3
