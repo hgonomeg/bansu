@@ -207,6 +207,7 @@ build_libclipper() {
 
 build_chapi() {
   setup_build_env
+  ldconfig
   sed -i '/#include "density_map.hh"/a #include <cstdint>' /download/coot/cremer-pople-sphere/density_map.cc
   mkdir -p /build/chapi
   cd /build/chapi &&\
