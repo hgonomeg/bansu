@@ -11,9 +11,8 @@ pub struct AardvarkJob {
     pub args: AardvarkArgs,
 }
 
-pub struct Aardvark;
 
-impl Job for Aardvark {
+impl Job for AardvarkJob {
     fn name(&self) -> &'static str {
         "Aardvark"
     }

@@ -16,7 +16,7 @@ use job::{
     JobEntry, JobManager, JobManagerVibeCheck, LookupJob, NewJob,
     job_handle::JobHandleConfiguration,
     job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
-    job_type::{JobSpawnError, aardvark::AardvarkJob, acedrg::AcedrgJob},
+    job_type::{Job, JobSpawnError, aardvark::AardvarkJob, acedrg::AcedrgJob},
 };
 pub mod messages;
 use messages::*;
@@ -277,61 +277,36 @@ async fn job_ws(
     Ok(response)
 }
 
-#[options("/run_acedrg")]
-// This is here due to CORS necessities
-// Do we want to add this to utoipa?
-async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
-    // if let Some(val) = req.headers().get("Access-Control-Request-Method") {
-    //     if val.to_str().unwrap_or("") != "POST" {
-    //         HttpResponse::BadRequest()
-    //     }
-    // }
-    // if let Some(val) = req.headers().get("Access-Control-Request-Headers") {
-    //     match val.to_str().unwrap_or("") {
-    //         "content-type" | "Content-Type" => {
-
-    //         }
-    //         _ => {
-
-    //         }
-    //     }
-    // }
-    // Anything other than 404 is already nice
-    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods/OPTIONS#preflighted_requests_in_cors
+/// Shared CORS preflight response for /run_* endpoints.
+fn preflight_response() -> HttpResponse {
     HttpResponse::Ok()
         .insert_header(("Allow", "OPTIONS, POST"))
         .insert_header(("Access-Control-Allow-Headers", "content-type"))
-        // should also be set by nginx and therefore let's not put it here, not to cause a collision
-        // .insert_header(("Access-Control-Allow-Origin", "*"))
-        // The above permissions may be cached for 604,800 seconds (1 week)
         .insert_header(("Access-Control-Max-Age", "604800"))
         .finish()
 }
 
-#[cfg_attr(feature = "utoipa", utoipa::path(
-    description = "Creates `Acedrg` job.",
-    // this gets confused with input for the POST request
-    // request_body = JobSpawnReply,
-    // There seems to be no better way than to specify 'body' multiple times.
-    responses(
-        (status = 201, description = "Success (job spawned)", body = JobSpawnReply),
-        (status = 202, description = "Success (job queued)", body = JobSpawnReply),
-        (status = 400, description = "Input validation error", body = JobSpawnReply),
-        (status = 503, description = "Server is currently at capacity and is unable to handle your request", body = JobSpawnReply),
-        (status = 500, description = "Other error", body = JobSpawnReply),
-    ),
-))]
-#[post("/run_acedrg")]
-async fn run_acedrg(
-    args: web::Json<AcedrgArgs>,
+#[options("/run_acedrg")]
+async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
+    preflight_response()
+}
+
+#[options("/run_aardvark")]
+async fn run_aardvark_preflight(_req: HttpRequest) -> HttpResponse {
+    preflight_response()
+}
+
+/// Shared handler for POST /run_* endpoints. Constructs the job, sends it to
+/// the JobManager, and maps the response to the appropriate HTTP status.
+async fn run_job_helper(
+    route: &'static str,
+    jo: Arc<dyn Job>,
     job_manager: web::Data<Addr<JobManager>>,
     state: web::Data<State>,
     req: HttpRequest,
 ) -> HttpResponse {
     let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &req);
     let job_commiter_opt = FreshJobCommiter::with_state_and_request(&state, &req);
-    let args = args.into_inner();
-    let jo = Arc::from(AcedrgJob { args });
 
     match job_manager.send(NewJob(jo)).await.unwrap() {
         Ok(resp) => {
@@ -357,7 +332,7 @@ async fn run_acedrg(
         }
         Err(JobSpawnError::InputValidation(e)) => {
             let error_msg = format!("Could not create job: Input validation error - {:#}", &e);
-            log::warn!("/run_acedrg - {}", &error_msg);
+            log::warn!("{} - {}", route, &error_msg);
             let error_msg_c = error_msg.clone();
             tokio::spawn(async move {
                 stats_commiter_opt
@@ -375,12 +350,11 @@ async fn run_acedrg(
         }
         Err(JobSpawnError::TooManyJobs) => {
             let error_msg = "Could not create job: Too many jobs";
-            log::warn!("/run_acedrg - {}", error_msg);
+            log::warn!("{} - {}", route, error_msg);
             tokio::spawn(async move {
                 stats_commiter_opt
                     .commit_failed(&job_manager, Some(error_msg.to_string()))
                     .await;
-
                 if let Some(commiter) = job_commiter_opt {
                     commiter
                         .commit_fresh_job(None, Some(error_msg.to_string()))
@@ -395,7 +369,7 @@ async fn run_acedrg(
         }
         Err(JobSpawnError::Other(e)) => {
             let error_msg = format!("Could not create job: {:#}", &e);
-            log::error!("/run_acedrg - {}", &error_msg);
+            log::error!("{} - {}", route, &error_msg);
             let error_msg_c = error_msg.clone();
             tokio::spawn(async move {
                 stats_commiter_opt
@@ -415,10 +389,34 @@ async fn run_acedrg(
 }
 
 #[cfg_attr(feature = "utoipa", utoipa::path(
+    description = "Creates `Acedrg` job.",
+    responses(
+        (status = 201, description = "Success (job spawned)", body = JobSpawnReply),
+        (status = 202, description = "Success (job queued)", body = JobSpawnReply),
+        (status = 400, description = "Input validation error", body = JobSpawnReply),
+        (status = 503, description = "Server is currently at capacity and is unable to handle your request", body = JobSpawnReply),
+        (status = 500, description = "Other error", body = JobSpawnReply),
+    ),
+))]
+#[post("/run_acedrg")]
+async fn run_acedrg(
+    args: web::Json<AcedrgArgs>,
+    job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    req: HttpRequest,
+) -> HttpResponse {
+    run_job_helper(
+        "/run_acedrg",
+        Arc::from(AcedrgJob { args: args.into_inner() }),
+        job_manager,
+        state,
+        req,
+    )
+    .await
+}
+
+#[cfg_attr(feature = "utoipa", utoipa::path(
     description = "Creates `Aardvark` job.",
-    // this gets confused with input for the POST request
-    // request_body = JobSpawnReply,
-    // There seems to be no better way than to specify 'body' multiple times.
     responses(
         (status = 201, description = "Success (job spawned)", body = JobSpawnReply),
         (status = 202, description = "Success (job queued)", body = JobSpawnReply),
@@ -434,7 +432,14 @@ async fn run_aardvark(
     state: web::Data<State>,
     req: HttpRequest,
 ) -> HttpResponse {
-    HttpResponse::NotImplemented().finish()
+    run_job_helper(
+        "/run_aardvark",
+        Arc::from(AardvarkJob { args: args.into_inner() }),
+        job_manager,
+        state,
+        req,
+    )
+    .await
 }
 
 #[cfg_attr(
@@ -665,6 +670,7 @@ async fn main() -> anyhow::Result<()> {
                 .service(run_acedrg)
                 .service(run_acedrg_preflight)
                 .service(run_aardvark)
+                .service(run_aardvark_preflight)
                 .service(get_cif)
                 .service(get_json_result)
                 .service(job_ws);
