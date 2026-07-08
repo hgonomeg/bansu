@@ -2,16 +2,16 @@ use super::{Job, JobSpawnError, JobType};
 use crate::AardvarkArgs;
 use crate::job::{JobHandleConfiguration, job_handle::JobHandle, job_runner::OutputKind};
 use std::{
-    time::Duration,
+    env,
     future::Future,
     path::{Path, PathBuf},
     pin::Pin,
+    time::Duration,
 };
 
 pub struct AardvarkJob {
     pub args: AardvarkArgs,
 }
-
 
 impl Job for AardvarkJob {
     fn name(&self) -> &'static str {
@@ -40,7 +40,7 @@ impl Job for AardvarkJob {
     fn output_filename(&self, workdir_path: &Path, kind: OutputKind) -> Option<PathBuf> {
         match kind {
             OutputKind::JSON => Some(workdir_path.join(format!("{}.json", "todo__name_me"))),
-            _ => None, 
+            _ => None,
         }
     }
 

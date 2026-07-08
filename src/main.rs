@@ -110,13 +110,18 @@ async fn stream_output_file(
         Err(OutputRequestError::OutputKindNotSupported) => {
             log::error!(
                 "{}/{} - This job does not support {} output",
-                config.route_label, job_id, config.kind_label
+                config.route_label,
+                job_id,
+                config.kind_label
             );
             tokio::spawn(async move {
                 stats_commiter_opt
                     .commit_failed(
                         &job_manager,
-                        Some(format!("This job does not support {} output", config.kind_label)),
+                        Some(format!(
+                            "This job does not support {} output",
+                            config.kind_label
+                        )),
                     )
                     .await;
             });
@@ -128,7 +133,12 @@ async fn stream_output_file(
             let content_type = config.content_type;
             let (tx, rx) = tokio::sync::mpsc::channel::<Result<web::Bytes, std::io::Error>>(64);
             actix_rt::spawn(async move {
-                log::info!("{}/{} - Replying with {} file", route_label, job_id, kind_label);
+                log::info!(
+                    "{}/{} - Replying with {} file",
+                    route_label,
+                    job_id,
+                    kind_label
+                );
                 loop {
                     let mut buf = web::BytesMut::with_capacity(65536);
                     let read_res = file.read_buf(&mut buf).await;
@@ -176,12 +186,19 @@ async fn get_cif(
     state: web::Data<State>,
     http_req: HttpRequest,
 ) -> HttpResponse {
-    stream_output_file(path, job_manager, state, http_req, OutputEndpointConfig {
-        route_label: "/get_cif",
-        kind: OutputKind::CIF,
-        kind_label: "CIF",
-        content_type: "text/plain",
-    }).await
+    stream_output_file(
+        path,
+        job_manager,
+        state,
+        http_req,
+        OutputEndpointConfig {
+            route_label: "/get_cif",
+            kind: OutputKind::CIF,
+            kind_label: "CIF",
+            content_type: "text/plain",
+        },
+    )
+    .await
 }
 
 #[cfg_attr(feature = "utoipa", utoipa::path(
@@ -203,12 +220,19 @@ async fn get_json_result(
     state: web::Data<State>,
     http_req: HttpRequest,
 ) -> HttpResponse {
-    stream_output_file(path, job_manager, state, http_req, OutputEndpointConfig {
-        route_label: "/get_json_result",
-        kind: OutputKind::JSON,
-        kind_label: "JSON",
-        content_type: "application/json",
-    }).await
+    stream_output_file(
+        path,
+        job_manager,
+        state,
+        http_req,
+        OutputEndpointConfig {
+            route_label: "/get_json_result",
+            kind: OutputKind::JSON,
+            kind_label: "JSON",
+            content_type: "application/json",
+        },
+    )
+    .await
 }
 
 #[cfg_attr(feature = "utoipa", utoipa::path(
@@ -407,7 +431,9 @@ async fn run_acedrg(
 ) -> HttpResponse {
     run_job_helper(
         "/run_acedrg",
-        Arc::from(AcedrgJob { args: args.into_inner() }),
+        Arc::from(AcedrgJob {
+            args: args.into_inner(),
+        }),
         job_manager,
         state,
         req,
@@ -434,7 +460,9 @@ async fn run_aardvark(
 ) -> HttpResponse {
     run_job_helper(
         "/run_aardvark",
-        Arc::from(AardvarkJob { args: args.into_inner() }),
+        Arc::from(AardvarkJob {
+            args: args.into_inner(),
+        }),
         job_manager,
         state,
         req,
