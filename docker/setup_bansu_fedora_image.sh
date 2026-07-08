@@ -14,7 +14,7 @@ SERVALCAT_VER=0.4.142
 ACEDRG_VER=bzr
 
 COOT_FORK=pemsley
-COOT_COMMIT=5da7e89b4bd014aea0d06a484877773ed09fb0be
+COOT_COMMIT=da1b5ee8e33eb9c7d4f449fe9b05465d15b860ab
 FFTW2_VER=2.1.5
 MMDB2_VER=2.0.22
 LIBCCP4_VER=8.0.0
@@ -208,7 +208,6 @@ build_libclipper() {
 build_chapi() {
   setup_build_env
   ldconfig
-  sed -i '/#include "density_map.hh"/a #include <cstdint>' /download/coot/cremer-pople-sphere/density_map.cc
   mkdir -p /build/chapi
   cd /build/chapi &&\
   rm -rf *
