@@ -12,7 +12,7 @@ RDKIT_VER=2024_03_2
 GEMMI_VER=0.7.5
 SERVALCAT_VER=0.4.142
 # ACEDRG_VER=main
-ACEDRG_VER=bzr
+ACEDRG_VER=391
 
 COOT_FORK=pemsley
 COOT_COMMIT=da1b5ee8e33eb9c7d4f449fe9b05465d15b860ab
@@ -34,7 +34,7 @@ download_all() {
     # do_wget https://ccp4forge.rc-harwell.ac.uk/ccp4/acedrg/-/archive/main/acedrg-${ACEDRG_VER}.tar.gz &&\
     # tar -xf acedrg-${ACEDRG_VER}.tar.gz
     echo Checking-out acedrg with breezy \(be patient, this may take a long time\)...
-    brz checkout --light https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/ acedrg-${ACEDRG_VER} || exit 7
+    brz checkout --light -r ${ACEDRG_VER} https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/ acedrg-${ACEDRG_VER} || exit 7
 
 
     # Libeigen
