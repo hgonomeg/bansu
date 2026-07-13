@@ -157,8 +157,16 @@ build_servalcat() {
 }
 
 
+refresh_config_scripts() {
+  cg=`ls /usr/share/automake-*/config.guess | head -1`
+  cs=`ls /usr/share/automake-*/config.sub | head -1`
+  find "$1" -name config.guess -exec cp -f "$cg" {} \;
+  find "$1" -name config.sub -exec cp -f "$cs" {} \;
+}
+
 build_fftw2() {
   setup_build_env
+  refresh_config_scripts /download/fftw-${FFTW2_VER}
   cd /download/fftw-${FFTW2_VER} &&\
   ./configure --prefix=/usr --enable-shared --disable-static --with-gcc --with-gnu-ld &&\
   make -j`nproc --all` && make install || exit 8
@@ -167,6 +175,7 @@ build_fftw2() {
 
 build_mmdb2() {
   setup_build_env
+  refresh_config_scripts /download/mmdb2-${MMDB2_VER}
   cd /download/mmdb2-${MMDB2_VER} &&\
   FFLAGS="-std=f2008 -fallow-argument-mismatch" \
   ./configure --prefix=/usr --enable-shared &&\
@@ -176,6 +185,7 @@ build_mmdb2() {
 
 build_libccp4() {
   setup_build_env
+  refresh_config_scripts /download/libccp4-${LIBCCP4_VER}
   cd /download/libccp4-${LIBCCP4_VER} &&\
   FFLAGS="-std=f2008 -fallow-argument-mismatch" \
   CFLAGS="-Wno-incompatible-pointer-types -std=gnu17" \
@@ -195,6 +205,7 @@ build_libssm() {
 
 build_libclipper() {
   setup_build_env
+  refresh_config_scripts /download/${CLIPPER_DIR}
   sed -i 's/from >> &word\[0\]/from >> word/' /download/${CLIPPER_DIR}/clipper/cif/cif_data_io.cpp
   cd /download/${CLIPPER_DIR} &&\
   CXXFLAGS="-O2 -fno-strict-aliasing -Wno-narrowing" \
