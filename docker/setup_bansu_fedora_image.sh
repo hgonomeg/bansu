@@ -113,6 +113,7 @@ build_rdkit() {
   rm -rf *
   cmake -S /download/RDKit_${RDKIT_VER} \
   -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=release \
+  -DCMAKE_C_FLAGS="-std=gnu17" \
   -DRDK_BUILD_CAIRO_SUPPORT=OFF \
   -DRDK_BUILD_INCHI_SUPPORT=OFF \
   -DRDK_BUILD_FREETYPE_SUPPORT=OFF \
