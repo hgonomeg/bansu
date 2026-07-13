@@ -134,8 +134,52 @@ build_gemmi() {
   cd ..
 }
 
+# RDKit >=2022.09 only assigns the private "_CIPRank" atom property when a
+# molecule has (potential) stereocentres, so achiral ligands (e.g. benzene) make
+# acedrg crash with KeyError: '_CIPRank'. Backfill it from the canonical atom
+# ranking. Idempotent; drop once acedrg supports newer RDKit upstream.
+patch_acedrg() {
+  srcs=`find /download/acedrg-${ACEDRG_VER} -name acedrgRDKit.py`
+  [ -n "$srcs" ] || { echo "patch_acedrg: no acedrgRDKit.py under /download/acedrg-${ACEDRG_VER}"; exit 8; }
+  python3 - $srcs <<'PYEOF' || exit 8
+import sys
+anchor = (
+    "        rdmolops.AssignStereochemistry(\n"
+    "            tMol, cleanIt=True, force=True, flagPossibleStereoCenters=True)\n"
+)
+inject = anchor + (
+    "\n"
+    "        # _CIPRank backfill: RDKit >=2022.09 only assigns the private\n"
+    "        # \"_CIPRank\" property when the molecule has (potential) stereocentres;\n"
+    "        # achiral molecules (e.g. benzene) get none, so the reads below would\n"
+    "        # KeyError. Fill missing ranks from the canonical atom ranking.\n"
+    "        if any(not a.HasProp(\"_CIPRank\") for a in tMol.GetAtoms()):\n"
+    "            canonRanks = Chem.CanonicalRankAtoms(tMol, breakTies=False)\n"
+    "            for aAtom, aRank in zip(tMol.GetAtoms(), canonRanks):\n"
+    "                if not aAtom.HasProp(\"_CIPRank\"):\n"
+    "                    aAtom.SetIntProp(\"_CIPRank\", int(aRank))\n"
+)
+touched = already = 0
+for path in sys.argv[1:]:
+    with open(path) as fh:
+        src = fh.read()
+    if "_CIPRank backfill" in src:
+        already += 1
+        continue
+    if anchor not in src:
+        continue
+    with open(path, "w") as fh:
+        fh.write(src.replace(anchor, inject, 1))
+    print("patch_acedrg: applied to", path)
+    touched += 1
+if touched == 0 and already == 0:
+    sys.exit("patch_acedrg: anchor not found in any acedrgRDKit.py (acedrg source changed?)")
+PYEOF
+}
+
 build_acedrg() {
   setup_build_env
+  patch_acedrg
   mkdir -p /build/acedrg
   cd /build/acedrg &&\
   rm -rf *
