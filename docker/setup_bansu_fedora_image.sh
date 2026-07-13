@@ -108,6 +108,7 @@ build_eigen() {
 
 build_rdkit() {
   setup_build_env
+  sed -i 's/_Py_IsFinalizing/Py_IsFinalizing/' /download/RDKit_${RDKIT_VER}/Code/RDBoost/Wrap/RDBase.cpp
   mkdir -p /build/rdkit
   cd /build/rdkit &&\
   rm -rf *
