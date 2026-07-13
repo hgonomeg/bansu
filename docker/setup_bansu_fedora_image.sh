@@ -7,7 +7,8 @@ do_wget() {
 AARDVARK_VER=0.2.0
 # Currently, gemmi build fails if we use anything newer than eigen 3
 LIBEIGEN_VER=3.4.0
-RDKIT_VER=2026_03_3
+# Acrdrg currently does not support 2026_03_3
+RDKIT_VER=2024_03_2
 GEMMI_VER=0.7.5
 SERVALCAT_VER=0.4.142
 # ACEDRG_VER=main
