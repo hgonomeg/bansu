@@ -1,0 +1,93 @@
+#!/bin/sh
+
+# Update git commit hashes for dependencies in setup_bansu_fedora_image.sh
+
+SCRIPT_DIR=`dirname -- "$( readlink -f -- "$0"; )"`
+TARGET_FILE="${SCRIPT_DIR}/setup_bansu_fedora_image.sh"
+
+show_help() {
+    echo "Update git commit hashes in setup_bansu_fedora_image.sh to their newest versions."
+    echo "---"
+    echo "Supported dependencies: coot"
+    echo "---"
+    echo "Usage:"
+    echo "    $0 <dependency> [optional commit hash]"
+    echo "The commit hash should be the full 40-char SHA."
+    echo "Examples:"
+    echo "    $0 coot"
+    echo "    $0 coot bcac9be5194e..."
+    echo "---"
+    echo "For Coot, you can also change the fork:"
+    echo "    $0 coot [fork_owner]:[optional commit hash]"
+    echo "Examples:"
+    echo "    $0 coot hgonomeg:"
+    echo "    $0 coot hgonomeg:bcac9be5194e..."
+}
+
+### $1 - Owner
+### $2 - Repo
+### $3 - Branch
+query_current_commit_hash_from_github() {
+    git ls-remote "https://github.com/${1}/${2}.git" "refs/heads/${3}" | awk '{print $1}'
+}
+
+### Get current fork from setup script
+get_target_fork() {
+    grep "^COOT_FORK=" "$TARGET_FILE" | cut -d'=' -f2
+}
+
+### $1 - dependency (lowercase name, e.g. "coot")
+### $2 - target fork
+update_dep_fork() {
+    old_fork=$(grep "^${1}_FORK=" "$TARGET_FILE" | cut -d'=' -f2)
+    if [ "x$old_fork" = "x$2" ]; then
+        echo "The target fork ($2) is already set."
+    else
+        sed -i.bak "s/^${1}_FORK=.*/${1}_FORK=$2/" "$TARGET_FILE" && \
+        echo "Updated ${1}_FORK to $2 (was $old_fork)" || \
+        echo "Failed to update fork for $1"
+        rm -f "${TARGET_FILE}.bak"
+    fi
+}
+
+### $1 - dependency (lowercase name, e.g. "coot")
+### $2 - target hash (full 40-char SHA)
+update_dep_hash() {
+    upper=$(echo "$1" | tr '[:lower:]' '[:upper:]')
+    old_hash=$(grep "^${upper}_COMMIT=" "$TARGET_FILE" | cut -d'=' -f2)
+    if [ "x$old_hash" = "x$2" ]; then
+        echo "The target hash ($2) is already set."
+    else
+        sed -i.bak "s/^${upper}_COMMIT=.*/${upper}_COMMIT=$2/" "$TARGET_FILE" && \
+        echo "Updated ${upper}_COMMIT to $2 (was $old_hash)" || \
+        echo "Failed to update commit hash for $1"
+        rm -f "${TARGET_FILE}.bak"
+    fi
+}
+
+case $1 in
+    coot)
+        if [ "x$2" = "x" ]; then
+            target_fork=$(get_target_fork)
+            echo "Querying newest commit hash for $target_fork/coot/main..."
+            commit_hash=$(query_current_commit_hash_from_github "$target_fork" coot main)
+            update_dep_hash coot "$commit_hash"
+        else
+            if echo "$2" | grep -q ':'; then
+                target_fork=$(echo "$2" | cut -d':' -f1)
+                commit_hash=$(echo "$2" | cut -d':' -f2)
+                if [ "x$commit_hash" = "x" ]; then
+                    echo "Querying newest commit hash for $target_fork/coot/main..."
+                    commit_hash=$(query_current_commit_hash_from_github "$target_fork" coot main)
+                fi
+                update_dep_fork coot "$target_fork"
+                update_dep_hash coot "$commit_hash"
+            else
+                update_dep_hash coot "$2"
+            fi
+        fi
+        ;;
+    *)
+        show_help
+        ;;
+esac

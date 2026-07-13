@@ -1,7 +1,8 @@
 name: Build Bansu Fedora image
 
 # Builds and tests the image on every push that touches the Docker inputs (any
-# branch), then pushes the *tested* image to Docker Hub (only on the `atman` branch).
+# branch), natively on each architecture, then publishes a multi-arch `latest`
+# manifest to Docker Hub (only on the `atman` branch).
 # Push-only (no pull_request trigger) so a commit never builds twice in parallel.
 on:
   push:
@@ -21,9 +22,20 @@ env:
   IMAGE: quicillith/bansu_fedora
 
 jobs:
-  build-test-publish:
-    runs-on: ubuntu-latest
-    # The image compiles RDKit/gemmi/acedrg/etc. from source; give it room.
+  build-test:
+    strategy:
+      # Keep building the other arch even if one fails (arch-specific debugging).
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    # The image compiles RDKit/gemmi/acedrg/Coot/etc. from source; give it room.
     timeout-minutes: 180
     steps:
       - name: Checkout
@@ -41,21 +53,23 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       # Context is docker/ because the Dockerfile COPYs wrappers/ and the setup script.
-      # load: true puts the image in the local daemon so we test (and push) these exact bytes.
-      - name: Build image
+      # load: true puts the native image in the local daemon so we test these exact bytes.
+      # Cache is scoped per-arch so amd64 and arm64 don't evict each other.
+      - name: Build image (${{ matrix.arch }})
         uses: docker/build-push-action@v7
         with:
           context: ./docker
           file: ./docker/FedoraDockerfile
+          platforms: ${{ matrix.platform }}
           load: true
           push: false
-          tags: ${{ env.IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.IMAGE }}:ci-${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
 
       - name: Test image contents
         run: |
-          docker run --rm "$IMAGE:latest" bash -euo pipefail -c '
+          docker run --rm "$IMAGE:ci-${{ matrix.arch }}" bash -euo pipefail -c '
             echo "== RDKit =="
             python3 -c "import rdkit; print(rdkit.rdBase.rdkitVersion)"
 
@@ -85,7 +99,7 @@ jobs:
             echo "All checks passed."
           '
 
-      # --- Publish the tested image to Docker Hub (aardvark pushes only) -----------
+      # --- Publish (atman pushes only): push the tested build by digest ------------
       # Requires repo secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN.
       - name: Log in to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/atman'
@@ -94,7 +108,63 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push tested image to Docker Hub
+      # Re-run served from the just-built cache (no recompile) to push by digest.
+      # push-by-digest emits no tag, so the two arches don't clobber a shared tag;
+      # the merge job stitches them into one multi-arch `latest`.
+      - name: Push image by digest
+        id: push
+        if: github.event_name == 'push' && github.ref == 'refs/heads/atman'
+        uses: docker/build-push-action@v7
+        with:
+          context: ./docker
+          file: ./docker/FedoraDockerfile
+          platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
         if: github.event_name == 'push' && github.ref == 'refs/heads/atman'
         run: |
-          docker push "$IMAGE:latest"
+          mkdir -p /tmp/digests
+          digest="${{ steps.push.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/atman'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Assemble the per-arch digests into a single multi-arch `latest` manifest.
+  merge:
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/atman'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create -t "$IMAGE:latest" \
+            $(printf "${IMAGE}@sha256:%s " *)
+
+      - name: Inspect published manifest
+        run: docker buildx imagetools inspect "$IMAGE:latest"
