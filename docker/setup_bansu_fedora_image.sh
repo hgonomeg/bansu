@@ -8,7 +8,7 @@ AARDVARK_VER=0.2.0
 # Currently, gemmi build fails if we use anything newer than eigen 3
 LIBEIGEN_VER=3.4.0
 # Acrdrg currently does not support 2026_03_3
-RDKIT_VER=2024_03_2
+RDKIT_VER=2025_09_6
 GEMMI_VER=0.7.5
 SERVALCAT_VER=0.4.142
 # ACEDRG_VER=main
@@ -108,7 +108,6 @@ build_eigen() {
 
 build_rdkit() {
   setup_build_env
-  sed -i 's/_Py_IsFinalizing/Py_IsFinalizing/' /download/RDKit_${RDKIT_VER}/Code/RDBoost/Wrap/RDBase.cpp
   mkdir -p /build/rdkit
   cd /build/rdkit &&\
   rm -rf *
