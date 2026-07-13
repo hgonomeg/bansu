@@ -16,7 +16,7 @@ use job::{
     JobEntry, JobManager, JobManagerVibeCheck, LookupJob, NewJob,
     job_handle::JobHandleConfiguration,
     job_runner::{OutputFileRequest, OutputKind, OutputRequestError},
-    job_type::{JobSpawnError, acedrg::AcedrgJob},
+    job_type::{Job, JobSpawnError, aardvark::AardvarkJob, acedrg::AcedrgJob},
 };
 pub mod messages;
 use messages::*;
@@ -39,14 +39,136 @@ use tokio::io::AsyncReadExt;
         title = "Bansu",
         description = "Server-side computation API for Moorhen"
     ),
-    paths(get_cif, run_acedrg, job_ws, vibe_check)
+    paths(get_cif, get_json_result, run_acedrg, run_aardvark, job_ws, vibe_check)
 )]
 struct ApiDoc;
 
+/// Configuration for a streaming output endpoint (CIF or JSON).
+struct OutputEndpointConfig {
+    route_label: &'static str,
+    kind: OutputKind,
+    kind_label: &'static str,
+    content_type: &'static str,
+}
+
+/// Shared handler for endpoints that stream a job output file (CIF or JSON).
+async fn stream_output_file(
+    path: web::Path<JobId>,
+    job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    http_req: HttpRequest,
+    config: OutputEndpointConfig,
+) -> HttpResponse {
+    let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &http_req);
+    let job_id = path.into_inner();
+
+    let Some(job_entry) = job_manager.send(LookupJob(job_id.clone())).await.unwrap() else {
+        log::error!("{}/{} - Job not found", config.route_label, job_id);
+        tokio::spawn(async move {
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some("Job not found".into()))
+                .await;
+        });
+        return HttpResponse::NotFound().finish();
+    };
+
+    let JobEntry::Spawned(job) = job_entry else {
+        log::error!("{}/{} - Job is still queued.", config.route_label, job_id);
+        tokio::spawn(async move {
+            stats_commiter_opt
+                .commit_failed(&job_manager, Some("Job is still queued".into()))
+                .await;
+        });
+        return HttpResponse::BadRequest().finish();
+    };
+
+    let file_res = job
+        .send(OutputFileRequest { kind: config.kind })
+        .await
+        .unwrap();
+
+    match file_res {
+        Err(OutputRequestError::IOError(e)) => {
+            let error_msg = format!("Could not open output - {}", &e);
+            log::error!("{}/{} - {}", config.route_label, job_id, &error_msg);
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some(error_msg))
+                    .await;
+            });
+            HttpResponse::InternalServerError().body(e.to_string())
+        }
+        Err(OutputRequestError::JobStillPending) => {
+            log::warn!("{}/{} - Job is still pending.", config.route_label, job_id);
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(&job_manager, Some("Job is still pending".into()))
+                    .await;
+            });
+            HttpResponse::BadRequest().finish()
+        }
+        Err(OutputRequestError::OutputKindNotSupported) => {
+            log::error!(
+                "{}/{} - This job does not support {} output",
+                config.route_label,
+                job_id,
+                config.kind_label
+            );
+            tokio::spawn(async move {
+                stats_commiter_opt
+                    .commit_failed(
+                        &job_manager,
+                        Some(format!(
+                            "This job does not support {} output",
+                            config.kind_label
+                        )),
+                    )
+                    .await;
+            });
+            HttpResponse::BadRequest().finish()
+        }
+        Ok(mut file) => {
+            let route_label = config.route_label;
+            let kind_label = config.kind_label;
+            let content_type = config.content_type;
+            let (tx, rx) = tokio::sync::mpsc::channel::<Result<web::Bytes, std::io::Error>>(64);
+            actix_rt::spawn(async move {
+                log::info!(
+                    "{}/{} - Replying with {} file",
+                    route_label,
+                    job_id,
+                    kind_label
+                );
+                loop {
+                    let mut buf = web::BytesMut::with_capacity(65536);
+                    let read_res = file.read_buf(&mut buf).await;
+                    match read_res {
+                        Ok(n) => {
+                            if n == 0 {
+                                break;
+                            } else {
+                                let _ = tx.send(Ok(buf.into())).await;
+                            }
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Err(e)).await;
+                            break;
+                        }
+                    }
+                }
+            });
+            tokio::spawn(async move {
+                stats_commiter_opt.commit_successful(&job_manager).await;
+            });
+            HttpResponse::Ok()
+                .content_type(content_type)
+                .streaming(tokio_stream::wrappers::ReceiverStream::new(rx))
+        }
+    }
+}
+
 #[cfg_attr(feature = "utoipa", utoipa::path(
     description = "For Acedrg jobs, streams the contents of the CIF file generated by Acedrg.",
-    // Let's do this in responses instead?
-    // request_body(content_type = "text/plain", description = "Streamed CIF file contents. Present when successful."),
     responses(
         (status = 200, description = "Success. Streams CIF file contents", content_type = "text/plain"),
         (status = 404, description = "The given `job_id` is not valid"),
@@ -64,97 +186,53 @@ async fn get_cif(
     state: web::Data<State>,
     http_req: HttpRequest,
 ) -> HttpResponse {
-    let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &http_req);
-    let job_id = path.into_inner();
-
-    let Some(job_entry) = job_manager.send(LookupJob(job_id.clone())).await.unwrap() else {
-        log::error!("/get_cif/{} - Job not found", job_id);
-        tokio::spawn(async move {
-            stats_commiter_opt
-                .commit_failed(&job_manager, Some("Job not found".into()))
-                .await;
-        });
-        return HttpResponse::NotFound().finish();
-    };
-
-    let JobEntry::Spawned(job) = job_entry else {
-        log::error!("/get_cif/{} - Job is still queued.", job_id);
-        tokio::spawn(async move {
-            stats_commiter_opt
-                .commit_failed(&job_manager, Some("Job is still queued".into()))
-                .await;
-        });
-        return HttpResponse::BadRequest().finish();
-    };
-
-    let file_res = job
-        .send(OutputFileRequest {
+    stream_output_file(
+        path,
+        job_manager,
+        state,
+        http_req,
+        OutputEndpointConfig {
+            route_label: "/get_cif",
             kind: OutputKind::CIF,
-        })
-        .await
-        .unwrap();
+            kind_label: "CIF",
+            content_type: "text/plain",
+        },
+    )
+    .await
+}
 
-    match file_res {
-        Err(OutputRequestError::IOError(e)) => {
-            let error_msg = format!("Could not open output - {}", &e);
-            log::error!("/get_cif/{} - {}", job_id, &error_msg);
-            tokio::spawn(async move {
-                stats_commiter_opt
-                    .commit_failed(&job_manager, Some(error_msg))
-                    .await;
-            });
-            HttpResponse::InternalServerError().body(e.to_string())
-        }
-        Err(OutputRequestError::JobStillPending) => {
-            log::warn!("/get_cif/{} - Job is still pending.", job_id);
-            tokio::spawn(async move {
-                stats_commiter_opt
-                    .commit_failed(&job_manager, Some("Job is still pending".into()))
-                    .await;
-            });
-            HttpResponse::BadRequest().finish()
-        }
-        Err(OutputRequestError::OutputKindNotSupported) => {
-            log::error!("/get_cif/{} - This job does not support CIF output", job_id);
-            tokio::spawn(async move {
-                stats_commiter_opt
-                    .commit_failed(
-                        &job_manager,
-                        Some("This job does not support CIF output".into()),
-                    )
-                    .await;
-            });
-            HttpResponse::BadRequest().finish()
-        }
-        Ok(mut file) => {
-            let (tx, rx) = tokio::sync::mpsc::channel::<Result<web::Bytes, std::io::Error>>(64);
-            actix_rt::spawn(async move {
-                log::info!("/get_cif/{} - Replying with CIF file", job_id);
-                loop {
-                    let mut buf = web::BytesMut::with_capacity(65536);
-                    let read_res = file.read_buf(&mut buf).await;
-                    match read_res {
-                        Ok(n) => {
-                            if n == 0 {
-                                // end of file
-                                break;
-                            } else {
-                                let _ = tx.send(Ok(buf.into())).await;
-                            }
-                        }
-                        Err(e) => {
-                            let _ = tx.send(Err(e)).await;
-                            break;
-                        }
-                    }
-                }
-            });
-            tokio::spawn(async move {
-                stats_commiter_opt.commit_successful(&job_manager).await;
-            });
-            HttpResponse::Ok().streaming(tokio_stream::wrappers::ReceiverStream::new(rx))
-        }
-    }
+#[cfg_attr(feature = "utoipa", utoipa::path(
+    description = "For Aardvark jobs, streams the contents of the JSON result file generated by Aardvark.",
+    responses(
+        (status = 200, description = "Success. Streams JSON file contents", content_type = "application/json"),
+        (status = 404, description = "The given `job_id` is not valid"),
+        (status = 400, description = "The given `job_id` does not correspond to an `Aardvark` job or the job is still pending (or queued)"),
+        (status = 500, description = "Output file could not be read or other error"),
+    ),
+    params(
+        ("job_id", description = "Job ID")
+    )
+))]
+#[get("/get_json_result/{job_id}")]
+async fn get_json_result(
+    path: web::Path<JobId>,
+    job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    http_req: HttpRequest,
+) -> HttpResponse {
+    stream_output_file(
+        path,
+        job_manager,
+        state,
+        http_req,
+        OutputEndpointConfig {
+            route_label: "/get_json_result",
+            kind: OutputKind::JSON,
+            kind_label: "JSON",
+            content_type: "application/json",
+        },
+    )
+    .await
 }
 
 #[cfg_attr(feature = "utoipa", utoipa::path(
@@ -223,61 +301,36 @@ async fn job_ws(
     Ok(response)
 }
 
-#[options("/run_acedrg")]
-// This is here due to CORS necessities
-// Do we want to add this to utoipa?
-async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
-    // if let Some(val) = req.headers().get("Access-Control-Request-Method") {
-    //     if val.to_str().unwrap_or("") != "POST" {
-    //         HttpResponse::BadRequest()
-    //     }
-    // }
-    // if let Some(val) = req.headers().get("Access-Control-Request-Headers") {
-    //     match val.to_str().unwrap_or("") {
-    //         "content-type" | "Content-Type" => {
-
-    //         }
-    //         _ => {
-
-    //         }
-    //     }
-    // }
-    // Anything other than 404 is already nice
-    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods/OPTIONS#preflighted_requests_in_cors
+/// Shared CORS preflight response for /run_* endpoints.
+fn preflight_response() -> HttpResponse {
     HttpResponse::Ok()
         .insert_header(("Allow", "OPTIONS, POST"))
         .insert_header(("Access-Control-Allow-Headers", "content-type"))
-        // should also be set by nginx and therefore let's not put it here, not to cause a collision
-        // .insert_header(("Access-Control-Allow-Origin", "*"))
-        // The above permissions may be cached for 604,800 seconds (1 week)
         .insert_header(("Access-Control-Max-Age", "604800"))
         .finish()
 }
 
-#[cfg_attr(feature = "utoipa", utoipa::path(
-    description = "Creates `Acedrg` job.",
-    // this gets confused with input for the POST request
-    // request_body = JobSpawnReply,
-    // There seems to be no better way than to specify 'body' multiple times.
-    responses(
-        (status = 201, description = "Success (job spawned)", body = JobSpawnReply),
-        (status = 202, description = "Success (job queued)", body = JobSpawnReply),
-        (status = 400, description = "Input validation error", body = JobSpawnReply),
-        (status = 503, description = "Server is currently at capacity and is unable to handle your request", body = JobSpawnReply),
-        (status = 500, description = "Other error", body = JobSpawnReply),
-    ),
-))]
-#[post("/run_acedrg")]
-async fn run_acedrg(
-    args: web::Json<AcedrgArgs>,
+#[options("/run_acedrg")]
+async fn run_acedrg_preflight(_req: HttpRequest) -> HttpResponse {
+    preflight_response()
+}
+
+#[options("/run_aardvark")]
+async fn run_aardvark_preflight(_req: HttpRequest) -> HttpResponse {
+    preflight_response()
+}
+
+/// Shared handler for POST /run_* endpoints. Constructs the job, sends it to
+/// the JobManager, and maps the response to the appropriate HTTP status.
+async fn run_job_helper(
+    route: &'static str,
+    jo: Arc<dyn Job>,
     job_manager: web::Data<Addr<JobManager>>,
     state: web::Data<State>,
     req: HttpRequest,
 ) -> HttpResponse {
     let stats_commiter_opt = RequestStatCommiter::with_state_and_request(&state, &req);
     let job_commiter_opt = FreshJobCommiter::with_state_and_request(&state, &req);
-    let args = args.into_inner();
-    let jo = Arc::from(AcedrgJob { args });
 
     match job_manager.send(NewJob(jo)).await.unwrap() {
         Ok(resp) => {
@@ -303,7 +356,7 @@ async fn run_acedrg(
         }
         Err(JobSpawnError::InputValidation(e)) => {
             let error_msg = format!("Could not create job: Input validation error - {:#}", &e);
-            log::warn!("/run_acedrg - {}", &error_msg);
+            log::warn!("{} - {}", route, &error_msg);
             let error_msg_c = error_msg.clone();
             tokio::spawn(async move {
                 stats_commiter_opt
@@ -321,12 +374,11 @@ async fn run_acedrg(
         }
         Err(JobSpawnError::TooManyJobs) => {
             let error_msg = "Could not create job: Too many jobs";
-            log::warn!("/run_acedrg - {}", error_msg);
+            log::warn!("{} - {}", route, error_msg);
             tokio::spawn(async move {
                 stats_commiter_opt
                     .commit_failed(&job_manager, Some(error_msg.to_string()))
                     .await;
-
                 if let Some(commiter) = job_commiter_opt {
                     commiter
                         .commit_fresh_job(None, Some(error_msg.to_string()))
@@ -341,7 +393,7 @@ async fn run_acedrg(
         }
         Err(JobSpawnError::Other(e)) => {
             let error_msg = format!("Could not create job: {:#}", &e);
-            log::error!("/run_acedrg - {}", &error_msg);
+            log::error!("{} - {}", route, &error_msg);
             let error_msg_c = error_msg.clone();
             tokio::spawn(async move {
                 stats_commiter_opt
@@ -358,6 +410,64 @@ async fn run_acedrg(
             })
         }
     }
+}
+
+#[cfg_attr(feature = "utoipa", utoipa::path(
+    description = "Creates `Acedrg` job.",
+    responses(
+        (status = 201, description = "Success (job spawned)", body = JobSpawnReply),
+        (status = 202, description = "Success (job queued)", body = JobSpawnReply),
+        (status = 400, description = "Input validation error", body = JobSpawnReply),
+        (status = 503, description = "Server is currently at capacity and is unable to handle your request", body = JobSpawnReply),
+        (status = 500, description = "Other error", body = JobSpawnReply),
+    ),
+))]
+#[post("/run_acedrg")]
+async fn run_acedrg(
+    args: web::Json<AcedrgArgs>,
+    job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    req: HttpRequest,
+) -> HttpResponse {
+    run_job_helper(
+        "/run_acedrg",
+        Arc::from(AcedrgJob {
+            args: args.into_inner(),
+        }),
+        job_manager,
+        state,
+        req,
+    )
+    .await
+}
+
+#[cfg_attr(feature = "utoipa", utoipa::path(
+    description = "Creates `Aardvark` job.",
+    responses(
+        (status = 201, description = "Success (job spawned)", body = JobSpawnReply),
+        (status = 202, description = "Success (job queued)", body = JobSpawnReply),
+        (status = 400, description = "Input validation error", body = JobSpawnReply),
+        (status = 503, description = "Server is currently at capacity and is unable to handle your request", body = JobSpawnReply),
+        (status = 500, description = "Other error", body = JobSpawnReply),
+    ),
+))]
+#[post("/run_aardvark")]
+async fn run_aardvark(
+    args: web::Json<AardvarkArgs>,
+    job_manager: web::Data<Addr<JobManager>>,
+    state: web::Data<State>,
+    req: HttpRequest,
+) -> HttpResponse {
+    run_job_helper(
+        "/run_aardvark",
+        Arc::from(AardvarkJob {
+            args: args.into_inner(),
+        }),
+        job_manager,
+        state,
+        req,
+    )
+    .await
 }
 
 #[cfg_attr(
@@ -587,7 +697,10 @@ async fn main() -> anyhow::Result<()> {
             cfg.service(vibe_check)
                 .service(run_acedrg)
                 .service(run_acedrg_preflight)
+                .service(run_aardvark)
+                .service(run_aardvark_preflight)
                 .service(get_cif)
+                .service(get_json_result)
                 .service(job_ws);
 
             #[cfg(feature = "utoipa")]

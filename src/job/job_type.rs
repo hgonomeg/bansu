@@ -11,6 +11,7 @@ use super::{
     job_runner::OutputKind,
 };
 
+pub mod aardvark;
 pub mod acedrg;
 pub mod servalcat;
 
@@ -50,4 +51,5 @@ pub trait Job: Send {
 pub enum JobType {
     Acedrg,
     Servalcat,
+    Aardvark,
 }

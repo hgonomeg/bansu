@@ -10,8 +10,10 @@ use tokio::sync::OwnedSemaphorePermit;
 use thiserror::Error;
 use tokio::time::timeout;
 
+#[derive(Clone, Copy)]
 pub enum OutputKind {
     CIF,
+    JSON,
 }
 
 #[derive(Debug, Error)]

@@ -1,0 +1,140 @@
+#!/bin/sh
+
+# Update pinned dependency revisions (git / bazaar) in setup_bansu_fedora_image.sh
+
+SCRIPT_DIR=`dirname -- "$( readlink -f -- "$0"; )"`
+TARGET_FILE="${SCRIPT_DIR}/setup_bansu_fedora_image.sh"
+
+ACEDRG_BZR_URL="https://fg.oisin.rc-harwell.ac.uk/anonscm/bzr/acedrg/trunk/"
+
+show_help() {
+    echo "Update pinned dependency revisions in setup_bansu_fedora_image.sh to their newest versions."
+    echo "==="
+    echo "Supported dependencies:"
+    echo "    coot    git      github.com/<fork>/coot          ->  COOT_FORK, COOT_COMMIT"
+    echo "    acedrg  bazaar   CCP4 acedrg trunk               ->  ACEDRG_VER"
+    echo "==="
+    echo "Usage:"
+    echo "    $0 <dependency> [revision]"
+    echo ""
+    echo "  no [revision] : query the newest upstream revision and pin to it"
+    echo "  [revision]    : pin to that exact value"
+    echo "                    coot   - full 40-char git commit SHA"
+    echo "                    acedrg - a bzr revno (e.g. 391) or a revid (e.g. revid:...)"
+    echo "==="
+    echo "Examples:"
+    echo "    $0 coot                    # newest commit on <current fork>/coot main"
+    echo "    $0 coot bcac9be5194e...    # a specific coot commit SHA"
+    echo "    $0 acedrg                  # newest acedrg trunk revno"
+    echo "    $0 acedrg 391              # a specific acedrg revno"
+    echo "    $0 acedrg revid:flong@mrc-lmb.cam.ac.uk-20260422092106-amb8k54jt7sulohr"
+    echo "==="
+    echo "For coot you can also switch the fork, as owner:hash (either part optional):"
+    echo "    $0 coot hgonomeg:              # switch fork, use its newest main commit"
+    echo "    $0 coot hgonomeg:bcac9be519    # switch fork and pin a specific commit"
+    echo "    $0 coot pemsley:               # switch back to the upstream fork"
+}
+
+### $1 - Owner
+### $2 - Repo
+### $3 - Branch
+query_current_commit_hash_from_github() {
+    git ls-remote "https://github.com/${1}/${2}.git" "refs/heads/${3}" | awk '{print $1}'
+}
+
+### $1 - bzr branch URL
+query_current_bzr_revno() {
+    brz revno "$1"
+}
+
+### Get current fork from setup script
+get_target_fork() {
+    grep "^COOT_FORK=" "$TARGET_FILE" | cut -d'=' -f2
+}
+
+### $1 - dependency (lowercase name, e.g. "coot")
+### $2 - target fork
+update_dep_fork() {
+    old_fork=$(grep "^${1}_FORK=" "$TARGET_FILE" | cut -d'=' -f2)
+    if [ "x$old_fork" = "x$2" ]; then
+        echo "The target fork ($2) is already set."
+    else
+        sed -i.bak "s/^${1}_FORK=.*/${1}_FORK=$2/" "$TARGET_FILE" && \
+        echo "Updated ${1}_FORK to $2 (was $old_fork)" || \
+        echo "Failed to update fork for $1"
+        rm -f "${TARGET_FILE}.bak"
+    fi
+}
+
+### $1 - dependency (lowercase name, e.g. "coot")
+### $2 - target hash (full 40-char SHA)
+update_dep_hash() {
+    upper=$(echo "$1" | tr '[:lower:]' '[:upper:]')
+    old_hash=$(grep "^${upper}_COMMIT=" "$TARGET_FILE" | cut -d'=' -f2)
+    if [ "x$old_hash" = "x$2" ]; then
+        echo "The target hash ($2) is already set."
+    else
+        sed -i.bak "s/^${upper}_COMMIT=.*/${upper}_COMMIT=$2/" "$TARGET_FILE" && \
+        echo "Updated ${upper}_COMMIT to $2 (was $old_hash)" || \
+        echo "Failed to update commit hash for $1"
+        rm -f "${TARGET_FILE}.bak"
+    fi
+}
+
+### $1 - variable name (e.g. ACEDRG_VER)
+### $2 - new value
+update_var() {
+    old=$(grep "^${1}=" "$TARGET_FILE" | cut -d'=' -f2)
+    if [ "x$old" = "x$2" ]; then
+        echo "${1} is already set to $2."
+    else
+        sed -i.bak "s/^${1}=.*/${1}=$2/" "$TARGET_FILE" && \
+        echo "Updated ${1} to $2 (was $old)" || \
+        echo "Failed to update ${1}"
+        rm -f "${TARGET_FILE}.bak"
+    fi
+}
+
+case $1 in
+    coot)
+        if [ "x$2" = "x" ]; then
+            target_fork=$(get_target_fork)
+            echo "Querying newest commit hash for $target_fork/coot/main..."
+            commit_hash=$(query_current_commit_hash_from_github "$target_fork" coot main)
+            update_dep_hash coot "$commit_hash"
+        else
+            if echo "$2" | grep -q ':'; then
+                target_fork=$(echo "$2" | cut -d':' -f1)
+                commit_hash=$(echo "$2" | cut -d':' -f2)
+                if [ "x$commit_hash" = "x" ]; then
+                    echo "Querying newest commit hash for $target_fork/coot/main..."
+                    commit_hash=$(query_current_commit_hash_from_github "$target_fork" coot main)
+                fi
+                update_dep_fork coot "$target_fork"
+                update_dep_hash coot "$commit_hash"
+            else
+                update_dep_hash coot "$2"
+            fi
+        fi
+        ;;
+    acedrg)
+        if ! command -v brz >/dev/null 2>&1; then
+            echo "Error: 'brz' (breezy) is required to query acedrg revisions." >&2
+            exit 1
+        fi
+        if [ "x$2" = "x" ]; then
+            echo "Querying newest bzr revno for acedrg trunk..."
+            rev=$(query_current_bzr_revno "$ACEDRG_BZR_URL")
+        else
+            rev=$2
+        fi
+        if [ "x$rev" = "x" ]; then
+            echo "Failed to determine acedrg revision." >&2
+            exit 1
+        fi
+        update_var ACEDRG_VER "$rev"
+        ;;
+    *)
+        show_help
+        ;;
+esac
